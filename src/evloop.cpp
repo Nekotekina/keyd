@@ -54,6 +54,14 @@ int evloop(int (*event_handler) (struct event *ev))
 		event_handler(&ev);
 	}
 
+	bool monitor = true;
+	for (i = 0; i < device_table_sz; i++) {
+		if (device_table[i].grabbed) {
+			monitor = false;
+			break;
+		}
+	}
+
 	while (1) {
 		int removed = 0;
 
@@ -65,7 +73,11 @@ int evloop(int (*event_handler) (struct event *ev))
 
 		for (i = 0; i < device_table_sz; i++) {
 			pfds[i+1].fd = device_table[i].fd;
-			pfds[i+1].events = POLLIN | POLLERR;
+			pfds[i+1].events = 0;
+			if (monitor || device_table[i].grabbed)
+				pfds[i+1].events = POLLIN;
+			else if (device_table[i].capabilities & CAP_KEYBOARD && device_table[i].is_virtual)
+				pfds[i+1].events = POLLIN;
 		}
 
 		for (i = 0; i < nr_aux_fds; i++) {
@@ -89,15 +101,16 @@ int evloop(int (*event_handler) (struct event *ev))
 
 		for (i = 0; i < device_table_sz; i++) {
 			if (pfds[i+1].revents) {
-				struct device_event *devev;
+				struct device_event *devev = nullptr;
 
-				while ((devev = device_read_event(&device_table[i]))) {
-					if (devev->type == DEV_REMOVED) {
+				while ((pfds[i+1].revents & (POLLERR | POLLHUP)) || (devev = device_read_event(&device_table[i]))) {
+					if (!devev || devev->type == DEV_REMOVED) {
 						ev.type = EV_DEV_REMOVE;
 						ev.dev = &device_table[i];
 
 						timeout = event_handler(&ev);
 
+						close(device_table[i].fd);
 						device_table[i].fd = -1;
 						removed = 1;
 						break;
@@ -129,7 +142,6 @@ int evloop(int (*event_handler) (struct event *ev))
 
 		if (pfds[0].revents) {
 			struct device dev;
-
 			while (devmon_read_device(monfd, &dev) == 0) {
 				assert(device_table_sz < MAX_DEVICES);
 				device_table[device_table_sz++] = dev;

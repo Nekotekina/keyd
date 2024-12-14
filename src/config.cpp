@@ -38,7 +38,7 @@
 #undef warn
 #define warn(fmt, ...) keyd_log("\ty{WARNING:} " fmt "\n", ##__VA_ARGS__)
 
-enum action_arg_e {
+enum action_arg_e : short {
 	ARG_EMPTY,
 
 	ARG_MACRO,

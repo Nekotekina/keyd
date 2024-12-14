@@ -36,7 +36,7 @@ struct vkbd {
 	~vkbd()
 	{
 		close(fd);
-		// close(pfd); // ???
+		close(pfd);
 	}
 };
 
