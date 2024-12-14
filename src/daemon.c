@@ -90,6 +90,21 @@ static void add_listener(int con)
 	listeners[nr_listeners++] = con;
 }
 
+static void activate_leds(const struct keyboard *kbd)
+{
+	int active_layers = 0;
+
+	for (size_t i = 1; i < kbd->config.nr_layers; i++)
+		if (kbd->config.layers[i].type != LT_LAYOUT && kbd->layer_state[i].active) {
+			active_layers = 1;
+			break;
+		}
+
+	for (size_t i = 0; i < device_table_sz; i++)
+		if (device_table[i].data == kbd)
+			device_set_led(&device_table[i], 1, active_layers);
+}
+
 static void on_layer_change(const struct keyboard *kbd, const struct layer *layer, uint8_t state)
 {
 	size_t i;
@@ -100,17 +115,7 @@ static void on_layer_change(const struct keyboard *kbd, const struct layer *laye
 	size_t n = 0;
 
 	if (kbd->config.layer_indicator) {
-		int active_layers = 0;
-
-		for (i = 1; i < kbd->config.nr_layers; i++)
-			if (kbd->config.layers[i].type != LT_LAYOUT && kbd->layer_state[i].active) {
-				active_layers = 1;
-				break;
-			}
-
-		for (i = 0; i < device_table_sz; i++)
-			if (device_table[i].data == kbd)
-				device_set_led(&device_table[i], 1, active_layers);
+		activate_leds(kbd);
 	}
 
 	if (!nr_listeners)
@@ -502,15 +507,17 @@ static int event_handler(struct event *ev)
 		} else if (ev->dev->is_virtual && ev->devev->type == DEV_LED) {
 			size_t i;
 
-			/* 
+			/*
 			 * Propagate LED events received by the virtual device from userspace
 			 * to all grabbed devices.
-			 *
-			 * NOTE/TODO: Account for potential layer_indicator interference
 			 */
 			for (i = 0; i < device_table_sz; i++)
-				if (device_table[i].data)
+				if (device_table[i].data) {
+					struct keyboard* kbd = (struct keyboard*)device_table[i].data;
+					if (ev->devev->code == 1 && kbd->config.layer_indicator)
+						continue;
 					device_set_led(&device_table[i], ev->devev->code, ev->devev->pressed);
+				}
 		}
 
 		break;
@@ -535,6 +542,14 @@ static int event_handler(struct event *ev)
 	default:
 		break;
 	}
+
+	size_t i;
+	for (i = 0; i < device_table_sz; i++)
+		if (device_table[i].data) {
+			struct keyboard* kbd = (struct keyboard*)device_table[i].data;
+			if (kbd->config.layer_indicator)
+				activate_leds(kbd);
+		}
 
 	return timeout;
 }
