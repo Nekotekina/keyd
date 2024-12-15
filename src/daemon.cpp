@@ -75,7 +75,7 @@ static void add_listener(int con)
 		size_t i;
 		struct config *config = &active_kbd->config;
 
-		for (i = 0; i < config->nr_layers; i++) {
+		for (i = 0; i < config->layers.size(); i++) {
 			if (active_kbd->layer_state[i].active) {
 				struct layer *layer = &config->layers[i];
 
@@ -92,7 +92,7 @@ static void activate_leds(const struct keyboard *kbd)
 {
 	int active_layers = 0;
 
-	for (size_t i = 1; i < kbd->config.nr_layers; i++)
+	for (size_t i = 1; i < kbd->config.layers.size(); i++)
 		if (kbd->config.layers[i].type != LT_LAYOUT && kbd->layer_state[i].active) {
 			active_layers = 1;
 			break;

@@ -134,7 +134,7 @@ static void update_mods(struct keyboard *kbd, int excluded_layer_idx, uint8_t mo
 					NULL :
 					&kbd->config.layers[excluded_layer_idx];
 
-	for (i = 0; i < kbd->config.nr_layers; i++) {
+	for (i = 0; i < kbd->config.layers.size(); i++) {
 		struct layer *layer = &kbd->config.layers[i];
 		int excluded = 0;
 
@@ -193,7 +193,7 @@ static void lookup_descriptor(struct keyboard *kbd, uint8_t code,
 		return;
 	}
 
-	for (i = 0; i < kbd->config.nr_layers; i++) {
+	for (i = 0; i < kbd->config.layers.size(); i++) {
 		struct layer *layer = &kbd->config.layers[i];
 
 		if (kbd->layer_state[i].active) {
@@ -209,7 +209,7 @@ static void lookup_descriptor(struct keyboard *kbd, uint8_t code,
 
 	max = 0;
 	/* Scan for any composite matches (which take precedence). */
-	for (i = 0; i < kbd->config.nr_layers; i++) {
+	for (i = 0; i < kbd->config.layers.size(); i++) {
 		struct layer *layer = &kbd->config.layers[i];
 
 		if (layer->type == LT_COMPOSITE) {
@@ -243,7 +243,7 @@ static void lookup_descriptor(struct keyboard *kbd, uint8_t code,
 
 static void deactivate_layer(struct keyboard *kbd, int idx)
 {
-	dbg("Deactivating layer %s", kbd->config.layers[idx].name);
+	dbg("Deactivating layer %s", kbd->config.layers[idx].name.c_str());
 
 	assert(kbd->layer_state[idx].active > 0);
 	kbd->layer_state[idx].active--;
@@ -258,7 +258,7 @@ static void deactivate_layer(struct keyboard *kbd, int idx)
 
 static void activate_layer(struct keyboard *kbd, uint8_t code, int idx)
 {
-	dbg("Activating layer %s", kbd->config.layers[idx].name);
+	dbg("Activating layer %s", kbd->config.layers[idx].name.c_str());
 	struct cache_entry *ce;
 
 	kbd->layer_state[idx].activation_time = get_time();
@@ -332,7 +332,7 @@ static int check_chord_match(struct keyboard *kbd, const struct chord **chord, i
 	int partial_match = 0;
 	long maxts = -1;
 
-	for (idx = 0; idx < kbd->config.nr_layers; idx++) {
+	for (idx = 0; idx < kbd->config.layers.size(); idx++) {
 		size_t i;
 		struct layer *layer = &kbd->config.layers[idx];
 
@@ -400,7 +400,7 @@ static void clear_oneshot(struct keyboard *kbd)
 {
 	size_t i = 0;
 
-	for (i = 0; i < kbd->config.nr_layers; i++)
+	for (i = 0; i < kbd->config.layers.size(); i++)
 		while (kbd->layer_state[i].oneshot_depth) {
 			deactivate_layer(kbd, i);
 			kbd->layer_state[i].oneshot_depth--;
@@ -414,7 +414,7 @@ static void clear(struct keyboard *kbd)
 {
 	size_t i;
 	clear_oneshot(kbd);
-	for (i = 1; i < kbd->config.nr_layers; i++) {
+	for (i = 1; i < kbd->config.layers.size(); i++) {
 		struct layer *layer = &kbd->config.layers[i];
 
 		if (layer->type != LT_LAYOUT) {
@@ -435,7 +435,7 @@ static void setlayout(struct keyboard *kbd, uint8_t idx)
 	clear(kbd);
 	/* Only only layout may be active at a time */
 	size_t i;
-	for (i = 0; i < kbd->config.nr_layers; i++) {
+	for (i = 0; i < kbd->config.layers.size(); i++) {
 		struct layer *layer = &kbd->config.layers[i];
 
 		if (layer->type == LT_LAYOUT)
@@ -806,12 +806,13 @@ std::unique_ptr<keyboard> new_keyboard(struct config *config, const struct outpu
 	kbd->original_config = config;
 	kbd->config = *kbd->original_config;
 	kbd->output = *output;
+	kbd->layer_state.resize(config->layers.size());
 	kbd->layer_state[0].active = 1;
 	kbd->layer_state[0].activation_time = 0;
 
 	if (kbd->config.default_layout[0]) {
 		int found = 0;
-		for (i = 0; i < kbd->config.nr_layers; i++) {
+		for (i = 0; i < kbd->config.layers.size(); i++) {
 			struct layer *layer = &kbd->config.layers[i];
 
 			if (layer->type == LT_LAYOUT &&
