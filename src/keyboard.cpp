@@ -158,12 +158,12 @@ static void update_mods(struct keyboard *kbd, int excluded_layer_idx, uint8_t mo
 	set_mods(kbd, mods);
 }
 
-static void execute_macro(struct keyboard *kbd, int dl, const struct macro *macro)
+static void execute_macro(struct keyboard *kbd, int dl, const macro& macro)
 {
 	/* Minimize redundant modifier strokes for simple key sequences. */
-	if (macro->sz == 1 && macro->entries[0].type == MACRO_KEYSEQUENCE) {
-		uint8_t code = macro->entries[0].data;
-		uint8_t mods = macro->entries[0].data >> 8;
+	if (macro.size() == 1 && macro[0].type == MACRO_KEYSEQUENCE) {
+		uint8_t code = macro[0].data;
+		uint8_t mods = macro[0].data >> 8;
 
 		update_mods(kbd, dl, mods);
 		send_key(kbd, code, 1);
@@ -484,14 +484,11 @@ static long process_descriptor(struct keyboard *kbd, uint8_t code,
 	int timeout = 0;
 
 	if (pressed) {
-		struct macro *macro;
-
 		switch (d->op) {
 		case OP_LAYERM:
 		case OP_ONESHOTM:
 		case OP_TOGGLEM:
-			macro = &kbd->config.macros[d->args[1].idx];
-			execute_macro(kbd, dl, macro);
+			execute_macro(kbd, dl, kbd->config.macros[d->args[1].idx]);
 			break;
 		default:
 			break;
@@ -500,7 +497,6 @@ static long process_descriptor(struct keyboard *kbd, uint8_t code,
 
 	switch (d->op) {
 		int idx;
-		struct macro *macro;
 		struct descriptor *action;
 		uint8_t mods;
 		uint8_t new_code;
@@ -611,8 +607,7 @@ static long process_descriptor(struct keyboard *kbd, uint8_t code,
 	case OP_CLEARM:
 		if(pressed) {
 			clear(kbd);
-			macro = &kbd->config.macros[d->args[0].idx];
-			execute_macro(kbd, dl, macro);
+			execute_macro(kbd, dl, kbd->config.macros[d->args[0].idx]);
 		}
 		break;
 	case OP_CLEAR:
@@ -639,8 +634,7 @@ static long process_descriptor(struct keyboard *kbd, uint8_t code,
 					 * Macro release relies on event logic, so we can't just synthesize a
 					 * descriptor release.
 					 */
-					struct macro *macro = &kbd->config.macros[action->args[0].idx];
-					execute_macro(kbd, dl, macro);
+					execute_macro(kbd, dl, kbd->config.macros[action->args[0].idx]);
 				} else {
 					process_descriptor(kbd, code, action, dl, 1, time);
 					process_descriptor(kbd, code, action, dl, 0, time);
@@ -674,6 +668,7 @@ static long process_descriptor(struct keyboard *kbd, uint8_t code,
 	case OP_MACRO2:
 	case OP_MACRO:
 		if (pressed) {
+			::macro* macro;
 			if (d->op == OP_MACRO2) {
 				macro = &kbd->config.macros[d->args[2].idx];
 
@@ -688,7 +683,7 @@ static long process_descriptor(struct keyboard *kbd, uint8_t code,
 
 			clear_oneshot(kbd);
 
-			execute_macro(kbd, dl, macro);
+			execute_macro(kbd, dl, *macro);
 			kbd->active_macro = macro;
 			kbd->active_macro_layer = dl;
 
@@ -738,7 +733,6 @@ static long process_descriptor(struct keyboard *kbd, uint8_t code,
 	case OP_SWAP:
 	case OP_SWAPM:
 		idx = d->args[0].idx;
-		macro = d->op == OP_SWAPM ?  &kbd->config.macros[d->args[1].idx] : NULL;
 
 		if (pressed) {
 			size_t i;
@@ -781,13 +775,12 @@ static long process_descriptor(struct keyboard *kbd, uint8_t code,
 				}
 			}
 
-			if (macro)
-				execute_macro(kbd, dl, macro);
-		} else {
-			if (macro &&
-			    macro->sz == 1 &&
-			    macro->entries[0].type == MACRO_KEYSEQUENCE) {
-				uint8_t code = macro->entries[0].data;
+			if (d->op == OP_SWAPM)
+				execute_macro(kbd, dl, kbd->config.macros[d->args[1].idx]);
+		} else if (d->op == OP_SWAPM) {
+			auto& macro = kbd->config.macros[d->args[1].idx];
+			if (macro.size() == 1 && macro[0].type == MACRO_KEYSEQUENCE) {
+				uint8_t code = macro[0].data;
 
 				send_key(kbd, code, 0);
 				update_mods(kbd, -1, 0);
@@ -1143,7 +1136,7 @@ static long process_event(struct keyboard *kbd, uint8_t code, int pressed, long 
 			kbd->active_macro = NULL;
 			update_mods(kbd, -1, 0);
 		} else if (time >= kbd->macro_timeout) {
-			execute_macro(kbd, kbd->active_macro_layer, kbd->active_macro);
+			execute_macro(kbd, kbd->active_macro_layer, *kbd->active_macro);
 			kbd->macro_timeout = time+kbd->macro_repeat_interval;
 			schedule_timeout(kbd, kbd->macro_timeout);
 		}

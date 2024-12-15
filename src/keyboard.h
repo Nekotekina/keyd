@@ -75,7 +75,7 @@ struct keyboard {
 
 	uint8_t inhibit_modifier_guard;
 
-	struct macro *active_macro;
+	::macro* active_macro;
 	int active_macro_layer;
 	int overload_last_layer_code;
 

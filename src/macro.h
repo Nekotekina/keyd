@@ -3,8 +3,9 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <vector>
 
-enum macro_e {
+enum macro_e : uint16_t {
 	MACRO_KEYSEQUENCE,
 	MACRO_HOLD,
 	MACRO_RELEASE,
@@ -22,16 +23,11 @@ struct macro_entry {
  * A series of key sequences optionally punctuated by
  * timeouts
  */
-struct macro {
-	struct macro_entry entries[64];
-
-	uint32_t sz;
-};
-
+using macro = std::vector<macro_entry>;
 
 void macro_execute(void (*output)(uint8_t, uint8_t),
-		   const struct macro *macro,
+		   const macro& macro,
 		   size_t timeout);
 
-int macro_parse(char *s, struct macro *macro);
+int macro_parse(char *s, macro& macro);
 #endif

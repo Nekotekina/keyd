@@ -484,19 +484,9 @@ exit:
  *   > 0 for all other errors
  */
 
-int parse_macro_expression(const char *s, struct macro *macro)
+int parse_macro_expression(const char *s, macro& macro)
 {
 	uint8_t code, mods;
-
-	#define ADD_ENTRY(t, d) do { \
-		if (macro->sz >= ARRAY_SIZE(macro->entries)) { \
-			err("maximum macro size (%d) exceeded", ARRAY_SIZE(macro->entries)); \
-			return 1; \
-		} \
-		macro->entries[macro->sz].type = t; \
-		macro->entries[macro->sz].data = d; \
-		macro->sz++; \
-	} while(0)
 
 	size_t len = strlen(s);
 
@@ -545,7 +535,7 @@ static int parse_descriptor(char *s,
 	size_t nargs = 0;
 	uint8_t code, mods;
 	int ret;
-	struct macro macro;
+	::macro macro;
 	std::string cmd;
 
 	if (!s || !s[0]) {
@@ -595,7 +585,7 @@ static int parse_descriptor(char *s,
 		config->commands.emplace_back(std::move(cmd));
 
 		return 0;
-	} else if ((ret=parse_macro_expression(s, &macro)) >= 0) {
+	} else if ((ret = parse_macro_expression(s, macro)) >= 0) {
 		if (ret)
 			return -1;
 
@@ -704,7 +694,7 @@ static int parse_descriptor(char *s,
 						}
 
 						config->macros.emplace_back();
-						if (parse_macro_expression(argstr, &config->macros.back())) {
+						if (parse_macro_expression(argstr, config->macros.back())) {
 							config->macros.pop_back();
 							return -1;
 						}
