@@ -75,7 +75,7 @@ static void add_listener(int con)
 		size_t i;
 		struct config *config = &active_kbd->config;
 
-		for (i = 0; i < config->nr_layers; i++) {
+		for (i = 0; i < config->layers.size(); i++) {
 			if (active_kbd->layer_state[i].active) {
 				struct layer *layer = &config->layers[i];
 
@@ -88,6 +88,21 @@ static void add_listener(int con)
 	listeners[nr_listeners++] = con;
 }
 
+static void activate_leds(const struct keyboard *kbd)
+{
+	int active_layers = 0;
+
+	for (size_t i = 1; i < kbd->config.layers.size(); i++)
+		if (kbd->config.layers[i].type != LT_LAYOUT && kbd->layer_state[i].active) {
+			active_layers = 1;
+			break;
+		}
+
+	for (size_t i = 0; i < device_table_sz; i++)
+		if (device_table[i].data == kbd)
+			device_set_led(&device_table[i], 1, active_layers);
+}
+
 static void on_layer_change(const struct keyboard *kbd, const struct layer *layer, uint8_t state)
 {
 	size_t i;
@@ -98,17 +113,7 @@ static void on_layer_change(const struct keyboard *kbd, const struct layer *laye
 	size_t n = 0;
 
 	if (kbd->config.layer_indicator) {
-		int active_layers = 0;
-
-		for (i = 1; i < kbd->config.nr_layers; i++)
-			if (kbd->config.layers[i].type != LT_LAYOUT && kbd->layer_state[i].active) {
-				active_layers = 1;
-				break;
-			}
-
-		for (i = 0; i < device_table_sz; i++)
-			if (device_table[i].data == kbd)
-				device_set_led(&device_table[i], 1, active_layers);
+		activate_leds(kbd);
 	}
 
 	if (!nr_listeners)

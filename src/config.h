@@ -14,7 +14,6 @@
 #define MAX_LAYER_NAME_LEN	64
 #define MAX_DESCRIPTOR_ARGS	3
 
-#define MAX_LAYERS		32
 #define MAX_EXP_LEN		512
 
 #define ID_EXCLUDED	1
@@ -106,7 +105,7 @@ struct layer {
 
 struct config {
 	std::string pathstr;
-	struct layer layers[MAX_LAYERS];
+	std::vector<layer> layers;
 
 	/* Auxiliary descriptors used by layer bindings. */
 	struct descriptor descriptors[1024];
@@ -123,7 +122,6 @@ struct config {
 
 	size_t nr_ids;
 
-	size_t nr_layers;
 	size_t nr_descriptors;
 
 	long macro_timeout;

@@ -386,18 +386,14 @@ static int config_add_layer(struct config *config, const char *s)
 	if (config_get_layer_index(config, name) != -1)
 			return 1;
 
-	if (config->nr_layers >= MAX_LAYERS) {
-		err("max layers (%d) exceeded", MAX_LAYERS);
-		return -1;
-	}
-
 	strcpy(buf, s);
-	ret = new_layer(buf, config, &config->layers[config->nr_layers]);
+	::layer new_layer = {};
+	ret = ::new_layer(buf, config, &new_layer);
 
 	if (ret < 0)
 		return -1;
 
-	config->nr_layers++;
+	config->layers.emplace_back(std::move(new_layer));
 	return 0;
 }
 
@@ -958,7 +954,7 @@ int config_get_layer_index(const struct config *config, const char *name)
 	if (!name)
 		return -1;
 
-	for (i = 0; i < config->nr_layers; i++)
+	for (i = 0; i < config->layers.size(); i++)
 		if (!strcmp(config->layers[i].name, name))
 			return i;
 
