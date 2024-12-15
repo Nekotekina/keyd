@@ -5,21 +5,13 @@
  * Returns 0 on success. Mangles the input string.
  */
 
-int macro_parse(char *s, struct macro *macro)
+int macro_parse(char *s, macro& macro)
 {
 	char *tok;
 
-	#define ADD_ENTRY(t, d) do { \
-		if (macro->sz >= ARRAY_SIZE(macro->entries)) { \
-			err("maximum macro size (%d) exceeded", ARRAY_SIZE(macro->entries)); \
-			return -1; \
-		} \
-		macro->entries[macro->sz].type = t; \
-		macro->entries[macro->sz].data = d; \
-		macro->sz++; \
-	} while(0)
+	#define ADD_ENTRY(t, d) macro.push_back(macro_entry{.type = t, .data = static_cast<uint16_t>(d)})
 
-	macro->sz = 0;
+	macro.clear();
 	for (tok = strtok(s, " "); tok; tok = strtok(NULL, " ")) {
 		uint8_t code, mods;
 		size_t len = strlen(tok);
@@ -83,13 +75,13 @@ int macro_parse(char *s, struct macro *macro)
 }
 
 void macro_execute(void (*output)(uint8_t, uint8_t),
-		   const struct macro *macro, size_t timeout)
+		   const macro& macro, size_t timeout)
 {
 	size_t i;
 	int hold_start = -1;
 
-	for (i = 0; i < macro->sz; i++) {
-		const struct macro_entry *ent = &macro->entries[i];
+	for (i = 0; i < macro.size(); i++) {
+		const macro_entry *ent = &macro[i];
 
 		switch (ent->type) {
 			size_t j;
@@ -109,7 +101,7 @@ void macro_execute(void (*output)(uint8_t, uint8_t),
 				size_t j;
 
 				for (j = hold_start; j < i; j++) {
-					const struct macro_entry *ent = &macro->entries[j];
+					const struct macro_entry *ent = &macro[j];
 					output(ent->data, 0);
 				}
 
