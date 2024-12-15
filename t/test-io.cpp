@@ -246,7 +246,7 @@ int main(int argc, char *argv[])
 	struct config config;
 	uint64_t total_time = 0;
 
-	struct keyboard* kbd;
+	std::unique_ptr<::keyboard> kbd;
 
 	struct output output = {
 		.send_key = send_key,
@@ -268,7 +268,7 @@ int main(int argc, char *argv[])
 	kbd = new_keyboard(&config, &output);
 
 	for (i = 2; i < argc; i++)
-		total_time += run_test(kbd, argv[i]);
+		total_time += run_test(kbd.get(), argv[i]);
 
 	printf("\nTotal time spent in the main loop: %zu us\n", total_time/1000);
 	return 0;

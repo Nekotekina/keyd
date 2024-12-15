@@ -5,6 +5,7 @@
  */
 
 #include "keyd.h"
+#include <memory>
 
 static long process_event(struct keyboard *kbd, uint8_t code, int pressed, long time);
 
@@ -804,12 +805,10 @@ static long process_descriptor(struct keyboard *kbd, uint8_t code,
 	return timeout;
 }
 
-struct keyboard *new_keyboard(struct config *config, const struct output *output)
+std::unique_ptr<keyboard> new_keyboard(struct config *config, const struct output *output)
 {
 	size_t i;
-	struct keyboard *kbd;
-
-	kbd = (struct keyboard*)calloc(1, sizeof(struct keyboard));
+	auto kbd = std::make_unique<keyboard>();
 
 	kbd->original_config = config;
 	memcpy(&kbd->config, kbd->original_config, sizeof(struct config));
