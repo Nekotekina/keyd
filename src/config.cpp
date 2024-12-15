@@ -24,6 +24,7 @@
 #include "strutil.h"
 #include "unicode.h"
 #include <limits>
+#include <string>
 
 #define MAX_FILE_SZ 65536
 #define MAX_LINE_LEN 256
@@ -85,26 +86,27 @@ static struct {
 
 static const char *resolve_include_path(const char *path, const char *include_path)
 {
-	static char resolved_path[PATH_MAX];
-	char tmp[PATH_MAX];
-	const char *dir;
+	static std::string resolved_path;
+	std::string tmp;
 
 	if (strstr(include_path, ".")) {
 		warn("%s: included files may not have a file extension", include_path);
 		return NULL;
 	}
 
-	strcpy(tmp, path);
-	dir = dirname(tmp);
-	snprintf(resolved_path, sizeof resolved_path, "%s/%s", dir, include_path);
+	tmp = path;
+	resolved_path = dirname(tmp.data());
+	resolved_path += '/';
+	resolved_path += include_path;
 
-	if (!access(resolved_path, F_OK))
-		return resolved_path;
+	if (!access(resolved_path.c_str(), F_OK))
+		return resolved_path.c_str();
 
-	snprintf(resolved_path, sizeof resolved_path, DATA_DIR"/%s", include_path);
+	resolved_path = DATA_DIR "/";
+	resolved_path += include_path;
 
-	if (!access(resolved_path, F_OK))
-		return resolved_path;
+	if (!access(resolved_path.c_str(), F_OK))
+		return resolved_path.c_str();
 
 	return NULL;
 }
@@ -937,7 +939,7 @@ int config_parse(struct config *config, const char *path)
 		return -1;
 
 	config_init(config);
-	snprintf(config->path, sizeof(config->path), "%s", path);
+	config->pathstr = path;
 	return config_parse_string(config, content);
 }
 

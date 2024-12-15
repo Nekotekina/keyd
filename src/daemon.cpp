@@ -229,7 +229,7 @@ static void manage_device(struct device *dev)
 		}
 
 		keyd_log("DEVICE: g{match}    %s  %s\t(%s)\n",
-			  dev->id, ent->config.path, dev->name);
+			  dev->id, ent->config.pathstr.c_str(), dev->name);
 
 		dev->data = ent->kbd.get();
 	} else {

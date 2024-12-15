@@ -46,7 +46,6 @@ int ipc_connect()
 
 int ipc_create_server()
 {
-	char lockpath[PATH_MAX];
 	int sd = socket(AF_UNIX, SOCK_STREAM, 0);
 	int lfd;
 	struct sockaddr_un addr = {};
@@ -59,8 +58,7 @@ int ipc_create_server()
 	}
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path)-1);
-	snprintf(lockpath, sizeof lockpath, "%s.lock", SOCKET_PATH);
-	lfd = open(lockpath, O_CREAT | O_RDONLY, 0600);
+	lfd = open(SOCKET_PATH ".lock", O_CREAT | O_RDONLY, 0600);
 
 	if (lfd < 0) {
 		perror("open");
