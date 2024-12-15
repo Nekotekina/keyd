@@ -118,16 +118,17 @@ test:
 	done
 test-io:
 	mkdir -p bin
-	$(CC) \
+	$(CXX) \
+	-std=c++20 \
 	-DDATA_DIR= \
 	-o bin/test-io \
-		t/test-io.c \
-		src/keyboard.c \
-		src/strutil.c \
-		src/macro.c \
-		src/config.c \
-		src/log.c \
-		src/ini.c \
-		src/keys.c  \
+		t/test-io.cpp \
+		src/keyboard.cpp \
+		src/string.cpp \
+		src/macro.cpp \
+		src/config.cpp \
+		src/log.cpp \
+		src/ini.cpp \
+		src/keys.cpp  \
 		src/unicode.c && \
 	./bin/test-io t/test.conf t/*.t
