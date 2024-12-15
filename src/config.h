@@ -17,11 +17,6 @@
 #define MAX_LAYERS		32
 #define MAX_EXP_LEN		512
 
-
-#ifndef PATH_MAX
-#define PATH_MAX 1024
-#endif
-
 #define ID_EXCLUDED	1
 #define ID_MOUSE	2
 #define ID_KEYBOARD	4
@@ -110,7 +105,7 @@ struct layer {
 };
 
 struct config {
-	char path[PATH_MAX];
+	std::string pathstr;
 	struct layer layers[MAX_LAYERS];
 
 	/* Auxiliary descriptors used by layer bindings. */
