@@ -35,6 +35,26 @@ struct output {
 	void (*on_layer_change) (const struct keyboard *kbd, const struct layer *layer, uint8_t active);
 };
 
+enum chord_state_e {
+	CHORD_RESOLVING,
+	CHORD_INACTIVE,
+	CHORD_PENDING_DISAMBIGUATION,
+	CHORD_PENDING_HOLD_TIMEOUT,
+};
+
+enum pending_behaviour_e {
+	PK_INTERRUPT_ACTION1,
+	PK_INTERRUPT_ACTION2,
+	PK_UNINTERRUPTIBLE,
+	PK_UNINTERRUPTIBLE_TAP_ACTION2,
+};
+
+struct active_chord {
+	uint8_t active;
+	struct chord chord;
+	int layer;
+};
+
 /* May correspond to more than one physical input device. */
 struct keyboard {
 	const struct config *original_config;
@@ -68,13 +88,9 @@ struct keyboard {
 	long last_simple_key_time;
 
 	long timeouts[64];
-	size_t nr_timeouts; 
+	size_t nr_timeouts;
 
-	struct active_chord {
-		uint8_t active;
-		struct chord chord;
-		int layer;
-	} active_chords[KEYD_CHORD_MAX-KEYD_CHORD_1+1];
+	struct active_chord active_chords[KEYD_CHORD_MAX-KEYD_CHORD_1+1];
 
 	struct {
 		struct key_event queue[32];
@@ -86,12 +102,7 @@ struct keyboard {
 		uint8_t start_code;
 		long last_code_time;
 
-		enum {
-			CHORD_RESOLVING,
-			CHORD_INACTIVE,
-			CHORD_PENDING_DISAMBIGUATION,
-			CHORD_PENDING_HOLD_TIMEOUT,
-		} state;
+		enum chord_state_e state;
 	} chord;
 
 	struct {
@@ -100,12 +111,7 @@ struct keyboard {
 		long expire;
 		long tap_expiry;
 
-		enum {
-			PK_INTERRUPT_ACTION1,
-			PK_INTERRUPT_ACTION2,
-			PK_UNINTERRUPTIBLE,
-			PK_UNINTERRUPTIBLE_TAP_ACTION2,
-		} behaviour;
+		enum pending_behaviour_e behaviour;
 
 		struct key_event queue[32];
 		size_t queue_sz;

@@ -36,7 +36,7 @@ static int create_virtual_keyboard(const char *name)
 	int i;
 	int ret;
 	size_t code;
-	struct uinput_user_dev udev = {0};
+	struct uinput_user_dev udev = {};
 
 	int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK | O_CLOEXEC);
 	if (fd < 0) {
@@ -114,7 +114,7 @@ static int create_virtual_keyboard(const char *name)
 static int create_virtual_pointer(const char *name)
 {
 	uint16_t code;
-	struct uinput_user_dev udev = {0};
+	struct uinput_user_dev udev = {};
 
 	int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK | O_CLOEXEC);
 	if (fd < 0) {
@@ -229,7 +229,7 @@ struct vkbd *vkbd_init(const char *name)
 {
 	pthread_t tid;
 
-	struct vkbd *vkbd = calloc(1, sizeof vkbd);
+	struct vkbd *vkbd = (struct vkbd*)calloc(1, sizeof vkbd);
 	vkbd->fd = create_virtual_keyboard(name);
 	vkbd->pfd = create_virtual_pointer("keyd virtual pointer");
 

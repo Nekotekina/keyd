@@ -4,14 +4,16 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+enum macro_e {
+	MACRO_KEYSEQUENCE,
+	MACRO_HOLD,
+	MACRO_RELEASE,
+	MACRO_UNICODE,
+	MACRO_TIMEOUT
+};
+
 struct macro_entry {
-	enum {
-		MACRO_KEYSEQUENCE,
-		MACRO_HOLD,
-		MACRO_RELEASE,
-		MACRO_UNICODE,
-		MACRO_TIMEOUT
-	} type;
+	enum macro_e type;
 
 	uint16_t data;
 };

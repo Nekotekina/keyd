@@ -68,18 +68,20 @@ struct event {
 	int fd;
 };
 
-struct ipc_message {
-	enum {
-		IPC_SUCCESS,
-		IPC_FAIL,
+enum ipc_msg_type_e {
+	IPC_SUCCESS,
+	IPC_FAIL,
 
-		IPC_BIND,
-		IPC_INPUT,
-		IPC_MACRO,
-		IPC_RELOAD,
-		IPC_LAYER_LISTEN,
-	} type;
-	
+	IPC_BIND,
+	IPC_INPUT,
+	IPC_MACRO,
+	IPC_RELOAD,
+	IPC_LAYER_LISTEN,
+};
+
+struct ipc_message {
+	enum ipc_msg_type_e type;
+
 	uint32_t timeout;
 	char data[MAX_IPC_MESSAGE_SIZE];
 	size_t sz;

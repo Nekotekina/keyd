@@ -128,7 +128,7 @@ static void update_key_state(uint16_t code, int state)
 
 struct vkbd *vkbd_init(const char *name)
 {
-	struct vkbd *vkbd = calloc(1, sizeof vkbd);
+	struct vkbd *vkbd = (struct vkbd*)calloc(1, sizeof vkbd);
 	vkbd->fd = create_virtual_keyboard();
 
 	return vkbd;

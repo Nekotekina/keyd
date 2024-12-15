@@ -163,7 +163,7 @@ static void load_configs()
 		len = snprintf(path, sizeof path, "%s/%s", CONFIG_DIR, dirent->d_name);
 
 		if (len >= 5 && !strcmp(path + len - 5, ".conf")) {
-			struct config_ent *ent = calloc(1, sizeof(struct config_ent));
+			struct config_ent *ent = (struct config_ent*)calloc(1, sizeof(struct config_ent));
 
 			keyd_log("CONFIG: parsing b{%s}\n", path);
 
@@ -257,9 +257,9 @@ static void reload()
 
 static void send_success(int con)
 {
-	struct ipc_message msg = {0};
+	struct ipc_message msg = {};
 
-	msg.type = IPC_SUCCESS;;
+	msg.type = IPC_SUCCESS;
 	msg.sz = 0;
 
 	xwrite(con, &msg, sizeof msg);
@@ -268,7 +268,7 @@ static void send_success(int con)
 
 static void send_fail(int con, const char *fmt, ...)
 {
-	struct ipc_message msg = {0};
+	struct ipc_message msg = {};
 	va_list args;
 
 	va_start(args, fmt);
@@ -427,7 +427,7 @@ static int event_handler(struct event *ev)
 {
 	static int last_time = 0;
 	static int timeout = 0;
-	struct key_event kev = {0};
+	struct key_event kev = {};
 
 	timeout -= ev->timestamp - last_time;
 	last_time = ev->timestamp;
@@ -446,8 +446,8 @@ static int event_handler(struct event *ev)
 		break;
 	case EV_DEV_EVENT:
 		if (ev->dev->data) {
-			struct keyboard *kbd = ev->dev->data;
-			active_kbd = ev->dev->data;
+			struct keyboard *kbd = (struct keyboard*)ev->dev->data;
+			active_kbd = kbd;
 			switch (ev->devev->type) {
 			size_t i;
 			case DEV_KEY:
@@ -495,10 +495,10 @@ static int event_handler(struct event *ev)
 					kev.pressed = 1;
 					kev.timestamp = ev->timestamp;
 
-					kbd_process_events(ev->dev->data, &kev, 1);
+					kbd_process_events((struct keyboard*)ev->dev->data, &kev, 1);
 
 					kev.pressed = 0;
-					timeout = kbd_process_events(ev->dev->data, &kev, 1);
+					timeout = kbd_process_events((struct keyboard*)ev->dev->data, &kev, 1);
 				}
 
 				vkbd_mouse_scroll(vkbd, ev->devev->x, ev->devev->y);
@@ -556,7 +556,7 @@ static int event_handler(struct event *ev)
 
 int run_daemon(int argc, char *argv[])
 {
-	ipcfd = ipc_create_server(SOCKET_PATH);
+	ipcfd = ipc_create_server(/* SOCKET_PATH */);
 	if (ipcfd < 0)
 		die("failed to create %s (another instance already running?)", SOCKET_PATH);
 
@@ -576,7 +576,7 @@ int run_daemon(int argc, char *argv[])
 
 	atexit(cleanup);
 
-	keyd_log("Starting keyd "VERSION"\n");
+	keyd_log("Starting keyd " VERSION "\n");
 	evloop(event_handler);
 
 	return 0;
