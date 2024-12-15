@@ -26,6 +26,21 @@ CFLAGS:=-DVERSION=\"v$(VERSION)\ \($(COMMIT)\)\" \
 	-Werror=format-security \
 	$(CFLAGS)
 
+CXXFLAGS:=-DVERSION=\"v$(VERSION)\ \($(COMMIT)\)\" \
+	-I/usr/local/include \
+	-L/usr/local/lib \
+	-Wall \
+	-Wextra \
+	-Wno-unused \
+	-std=c++20 \
+	-DSOCKET_PATH=\"$(SOCKET_PATH)\" \
+	-DCONFIG_DIR=\"$(CONFIG_DIR)\" \
+	-DDATA_DIR=\"$(PREFIX)/share/keyd\" \
+	-D_FORTIFY_SOURCE=2 \
+	-D_DEFAULT_SOURCE \
+	-Werror=format-security \
+	$(CXXFLAGS)
+
 platform=$(shell uname -s)
 
 ifeq ($(platform), Linux)
@@ -38,7 +53,7 @@ endif
 all: compose man
 	mkdir -p bin
 	cp scripts/keyd-application-mapper bin/
-	$(CC) $(CFLAGS) -O3 $(COMPAT_FILES) src/*.c src/vkbd/$(VKBD).c -lpthread -o bin/keyd $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -O3 $(COMPAT_FILES) src/*.cpp src/vkbd/$(VKBD).cpp -lpthread -o bin/keyd $(LDFLAGS)
 debug:
 	CFLAGS="-g -fsanitize=address -Wunused" $(MAKE)
 compose:
@@ -95,7 +110,7 @@ uninstall:
 		$(DESTDIR)$(PREFIX)/share/keyd/ \
 		$(DESTDIR)$(PREFIX)/bin/keyd-usb-gadget.sh
 clean:
-	rm -rf bin data/*.1.gz data/keyd.compose keyd.service src/unicode.c src/vkbd/usb-gadget.service
+	rm -rf bin data/*.1.gz data/keyd.compose keyd.service src/unicode.cpp src/vkbd/usb-gadget.service
 test:
 	@cd t; \
 	for f in *.sh; do \
@@ -103,16 +118,17 @@ test:
 	done
 test-io:
 	mkdir -p bin
-	$(CC) \
+	$(CXX) \
+	-std=c++20 \
 	-DDATA_DIR= \
 	-o bin/test-io \
-		t/test-io.c \
-		src/keyboard.c \
-		src/strutil.c \
-		src/macro.c \
-		src/config.c \
-		src/log.c \
-		src/ini.c \
-		src/keys.c  \
-		src/unicode.c && \
+		t/test-io.cpp \
+		src/keyboard.cpp \
+		src/string.cpp \
+		src/macro.cpp \
+		src/config.cpp \
+		src/log.cpp \
+		src/ini.cpp \
+		src/keys.cpp  \
+		src/unicode.cpp && \
 	./bin/test-io t/test.conf t/*.t

@@ -26,7 +26,7 @@ static void chgid()
 int ipc_connect()
 {
 	int sd = socket(AF_UNIX, SOCK_STREAM, 0);
-	struct sockaddr_un addr = {0};
+	struct sockaddr_un addr = {};
 
 	if (sd < 0) {
 		perror("socket");
@@ -49,7 +49,7 @@ int ipc_create_server()
 	char lockpath[PATH_MAX];
 	int sd = socket(AF_UNIX, SOCK_STREAM, 0);
 	int lfd;
-	struct sockaddr_un addr = {0};
+	struct sockaddr_un addr = {};
 
 	chgid();
 

@@ -28,22 +28,24 @@
 #define MAX_LINE_LEN 256
 
 #undef warn
-#define warn(fmt, ...) keyd_log("\ty{WARNING:} "fmt"\n", ##__VA_ARGS__)
+#define warn(fmt, ...) keyd_log("\ty{WARNING:} " fmt "\n", ##__VA_ARGS__)
+
+enum action_arg_e {
+	ARG_EMPTY,
+
+	ARG_MACRO,
+	ARG_LAYER,
+	ARG_LAYOUT,
+	ARG_TIMEOUT,
+	ARG_SENSITIVITY,
+	ARG_DESCRIPTOR,
+};
 
 static struct {
 	const char *name;
 	const char *preferred_name;
-	uint8_t op;
-	enum {
-		ARG_EMPTY,
-
-		ARG_MACRO,
-		ARG_LAYER,
-		ARG_LAYOUT,
-		ARG_TIMEOUT,
-		ARG_SENSITIVITY,
-		ARG_DESCRIPTOR,
-	} args[MAX_DESCRIPTOR_ARGS];
+	enum op op;
+	enum action_arg_e args[MAX_DESCRIPTOR_ARGS];
 } actions[] =  {
 	{ "swap", 	NULL,	OP_SWAP,	{ ARG_LAYER } },
 	{ "clear", 	NULL,	OP_CLEAR,	{} },
@@ -549,7 +551,7 @@ static int parse_descriptor(char *s,
 	struct command cmd;
 
 	if (!s || !s[0]) {
-		d->op = 0;
+		d->op = OP_NULL;
 		return 0;
 	}
 
@@ -986,7 +988,7 @@ int config_get_layer_index(const struct config *config, const char *name)
 int config_add_entry(struct config *config, const char *exp)
 {
 	char *keyname, *descstr, *dot, *paren, *s;
-	char *layername = "main";
+	const char *layername = "main";
 	struct descriptor d;
 	struct layer *layer;
 	int idx;
@@ -1025,4 +1027,3 @@ int config_add_entry(struct config *config, const char *exp)
 
 	return set_layer_entry(config, layer, keyname, &d);
 }
-

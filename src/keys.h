@@ -294,6 +294,6 @@ int parse_modset(const char *s, uint8_t *mods);
 int parse_key_sequence(const char *s, uint8_t *code, uint8_t *mods);
 
 extern const struct modifier modifiers[MAX_MOD];
-extern const struct keycode_table_ent keycode_table[256];
+extern const struct keycode_table_ent* keycode_table;
 
 #endif

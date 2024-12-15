@@ -2,11 +2,14 @@
 #include <stdlib.h>
 #include <time.h>
 #include "../src/keyd.h"
+#include <memory>
 
 #define MAX_EVENTS 1024
 
 struct key_event output[MAX_EVENTS];
 size_t noutput = 0;
+
+extern const size_t keycode_table_size;
 
 static uint64_t get_time_ns()
 {
@@ -29,7 +32,7 @@ static uint8_t lookup_code(const char *name)
 	if (!strcmp(name, "alt"))
 		return KEYD_LEFTALT;
 
-	for (i = 0; i < ARRAY_SIZE(keycode_table); i++)
+	for (i = 0; i < keycode_table_size; i++)
 		if (keycode_table[i].name && !strcmp(keycode_table[i].name, name))
 			return i;
 	return 0;
@@ -241,9 +244,9 @@ int main(int argc, char *argv[])
 {
 	size_t i;
 	struct config config;
-	uint64_t total_time;
+	uint64_t total_time = 0;
 
-	struct keyboard *kbd;
+	struct keyboard* kbd;
 
 	struct output output = {
 		.send_key = send_key,

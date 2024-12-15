@@ -6,7 +6,7 @@
 
 #include "keyd.h"
 
-static int ipc_exec(int type, const char *data, size_t sz, uint32_t timeout)
+static int ipc_exec(enum ipc_msg_type_e type, const char *data, size_t sz, uint32_t timeout)
 {
 	struct ipc_message msg;
 
@@ -163,7 +163,7 @@ static int input(int argc, char *argv[])
 
 static int layer_listen(int argc, char *argv[])
 {
-	struct ipc_message msg = {0};
+	struct ipc_message msg = {};
 
 	int con = ipc_connect();
 
@@ -186,7 +186,7 @@ static int layer_listen(int argc, char *argv[])
 	}
 }
 
-static int reload()
+static int reload(int argc, char *argv[])
 {
 	ipc_exec(IPC_RELOAD, NULL, 0, 0);
 

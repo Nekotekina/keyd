@@ -25,6 +25,7 @@
 #define ID_KEYBOARD	4
 
 enum op {
+	OP_NULL = 0,
 	OP_KEYSEQUENCE = 1,
 
 	OP_ONESHOT,
@@ -84,14 +85,16 @@ struct chord {
  * layers consisting of the corresponding modifier and an empty keymap.
  */
 
+enum layer_type_e {
+	LT_NORMAL,
+	LT_LAYOUT,
+	LT_COMPOSITE,
+};
+
 struct layer {
 	char name[MAX_LAYER_NAME_LEN+1];
 
-	enum {
-		LT_NORMAL,
-		LT_LAYOUT,
-		LT_COMPOSITE,
-	} type;
+	enum layer_type_e type;
 
 	uint8_t mods;
 	struct descriptor keymap[256];

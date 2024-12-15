@@ -39,18 +39,20 @@ struct device {
 	void *data;
 };
 
+enum dev_event_e {
+	DEV_KEY,
+	DEV_LED,
+
+	DEV_MOUSE_MOVE,
+	/* All absolute values are relative to a resolution of 1024x1024. */
+	DEV_MOUSE_MOVE_ABS,
+	DEV_MOUSE_SCROLL,
+
+	DEV_REMOVED,
+};
+
 struct device_event {
-	enum {
-		DEV_KEY,
-		DEV_LED,
-
-		DEV_MOUSE_MOVE,
-		/* All absolute values are relative to a resolution of 1024x1024. */
-		DEV_MOUSE_MOVE_ABS,
-		DEV_MOUSE_SCROLL,
-
-		DEV_REMOVED,
-	} type;
+	enum dev_event_e type;
 
 	uint8_t code;
 	uint8_t pressed;

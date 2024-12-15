@@ -179,7 +179,7 @@ static void lookup_descriptor(struct keyboard *kbd, uint8_t code,
 	size_t max;
 	size_t i;
 
-	d->op = 0;
+	d->op = OP_NULL;
 
 	long maxts = 0;
 
@@ -794,6 +794,8 @@ static long process_descriptor(struct keyboard *kbd, uint8_t code,
 		}
 
 		break;
+	default:
+		abort();
 	}
 
 	if (pressed)
@@ -807,7 +809,7 @@ struct keyboard *new_keyboard(struct config *config, const struct output *output
 	size_t i;
 	struct keyboard *kbd;
 
-	kbd = calloc(1, sizeof(struct keyboard));
+	kbd = (struct keyboard*)calloc(1, sizeof(struct keyboard));
 
 	kbd->original_config = config;
 	memcpy(&kbd->config, kbd->original_config, sizeof(struct config));
@@ -1031,7 +1033,7 @@ int handle_pending_key(struct keyboard *kbd, uint8_t code, int pressed, long tim
 	if (!kbd->pending_key.code)
 		return 0;
 
-	struct descriptor action = {0};
+	struct descriptor action = {};
 
 	if (code) {
 		struct key_event *ev;
@@ -1098,11 +1100,14 @@ int handle_pending_key(struct keyboard *kbd, uint8_t code, int pressed, long tim
 		kbd->pending_key.queue_sz = 0;
 		kbd->pending_key.tap_expiry = 0;
 
-		cache_set(kbd, code, &(struct cache_entry) {
+		struct cache_entry ce = {
+			.code = 0,
 			.d = action,
 			.dl = dl,
 			.layer = 0,
-		});
+		};
+
+		cache_set(kbd, code, &ce);
 		process_descriptor(kbd, code, &action, dl, 1, time);
 
 		/* Flush queued events */
@@ -1162,7 +1167,13 @@ static long process_event(struct keyboard *kbd, uint8_t code, int pressed, long 
 
 			lookup_descriptor(kbd, code, &d, &dl);
 
-			if (cache_set(kbd, code, &(struct cache_entry) { .d = d, .dl = dl, .layer = 0 }))
+			struct cache_entry ce = {
+				.code = 0,
+				.d = d,
+				.dl = dl,
+				.layer = 0,
+			};
+			if (cache_set(kbd, code, &ce))
 				goto exit;
 		} else {
 			struct cache_entry *ce;
