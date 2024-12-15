@@ -11,6 +11,7 @@
 #include "unicode.h"
 #include "config.h"
 #include "device.h"
+#include <memory>
 
 #define MAX_ACTIVE_KEYS	32
 #define CACHE_SIZE	16 //Effectively nkro
@@ -139,7 +140,7 @@ struct keyboard {
 	} scroll;
 };
 
-struct keyboard *new_keyboard(struct config *config, const struct output *output);
+std::unique_ptr<keyboard> new_keyboard(struct config *config, const struct output *output);
 
 long kbd_process_events(struct keyboard *kbd, const struct key_event *events, size_t n);
 int kbd_eval(struct keyboard *kbd, const char *exp);

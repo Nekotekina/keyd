@@ -1,14 +1,25 @@
 #include "keyd.h"
+#include <memory>
+#include <utility>
 
 struct config_ent {
-	struct config config;
-	struct keyboard *kbd;
-	struct config_ent *next;
+	struct config config = {};
+	std::unique_ptr<keyboard> kbd;
+	std::unique_ptr<config_ent> next;
+
+	config_ent() = default;
+	config_ent(const config_ent&) = delete;
+	config_ent& operator=(const config_ent&) = delete;
+	~config_ent()
+	{
+		while (std::unique_ptr<config_ent> ent = std::move(next))
+			next = std::move(ent->next);
+	}
 };
 
 static int ipcfd = -1;
-static struct vkbd *vkbd = NULL;
-static struct config_ent *configs;
+static std::shared_ptr<struct vkbd> vkbd;
+static std::unique_ptr<config_ent> configs;
 
 static uint8_t keystate[256];
 
@@ -16,23 +27,10 @@ static int listeners[32];
 static size_t nr_listeners = 0;
 static struct keyboard *active_kbd = NULL;
 
-static void free_configs()
-{
-	struct config_ent *ent = configs;
-	while (ent) {
-		struct config_ent *tmp = ent;
-		ent = ent->next;
-		free(tmp->kbd);
-		free(tmp);
-	}
-
-	configs = NULL;
-}
-
 static void cleanup()
 {
-	free_configs();
-	free_vkbd(vkbd);
+	configs.reset();
+	vkbd.reset();
 }
 
 static void clear_vkbd()
@@ -41,7 +39,7 @@ static void clear_vkbd()
 
 	for (i = 0; i < 256; i++)
 		if (keystate[i]) {
-			vkbd_send_key(vkbd, i, 0);
+			vkbd_send_key(vkbd.get(), i, 0);
 			keystate[i] = 0;
 		}
 }
@@ -49,7 +47,7 @@ static void clear_vkbd()
 static void send_key(uint8_t code, uint8_t state)
 {
 	keystate[code] = state;
-	vkbd_send_key(vkbd, code, state);
+	vkbd_send_key(vkbd.get(), code, state);
 }
 
 static void add_listener(int con)
@@ -151,7 +149,7 @@ static void load_configs()
 		exit(-1);
 	}
 
-	configs = NULL;
+	configs.reset();
 
 	while ((dirent = readdir(dh))) {
 		char path[1024];
@@ -163,7 +161,7 @@ static void load_configs()
 		len = snprintf(path, sizeof path, "%s/%s", CONFIG_DIR, dirent->d_name);
 
 		if (len >= 5 && !strcmp(path + len - 5, ".conf")) {
-			struct config_ent *ent = (struct config_ent*)calloc(1, sizeof(struct config_ent));
+			auto ent = std::make_unique<config_ent>();
 
 			keyd_log("CONFIG: parsing b{%s}\n", path);
 
@@ -174,10 +172,9 @@ static void load_configs()
 				};
 				ent->kbd = new_keyboard(&ent->config, &output);
 
-				ent->next = configs;
-				configs = ent;
+				ent->next = std::move(configs);
+				configs = std::move(ent);
 			} else {
-				free(ent);
 				keyd_log("DEVICE: y{WARNING} failed to parse %s\n", path);
 			}
 
@@ -189,7 +186,7 @@ static void load_configs()
 
 static struct config_ent *lookup_config_ent(const char *id, uint8_t flags)
 {
-	struct config_ent *ent = configs;
+	struct config_ent *ent = configs.get();
 	struct config_ent *match = NULL;
 	int rank = 0;
 
@@ -201,7 +198,7 @@ static struct config_ent *lookup_config_ent(const char *id, uint8_t flags)
 			rank = r;
 		}
 
-		ent = ent->next;
+		ent = ent->next.get();
 	}
 
 	/* The wildcard should not match mice. */
@@ -234,7 +231,7 @@ static void manage_device(struct device *dev)
 		keyd_log("DEVICE: g{match}    %s  %s\t(%s)\n",
 			  dev->id, ent->config.path, dev->name);
 
-		dev->data = ent->kbd;
+		dev->data = ent->kbd.get();
 	} else {
 		dev->data = NULL;
 		device_ungrab(dev);
@@ -246,7 +243,7 @@ static void reload()
 {
 	size_t i;
 
-	free_configs();
+	configs.reset();
 	load_configs();
 
 	for (i = 0; i < device_table_sz; i++)
@@ -287,6 +284,7 @@ static int input(char *buf, size_t sz, uint32_t timeout)
 	size_t i;
 	uint32_t codepoint;
 	uint8_t codes[4];
+	auto vkbd = ::vkbd.get();
 
 	int csz;
 
@@ -365,7 +363,6 @@ static void handle_client(int con)
 	}
 
 	switch (msg.type) {
-		struct config_ent *ent;
 		int success;
 		struct macro macro;
 
@@ -405,8 +402,8 @@ static void handle_client(int con)
 
 		msg.data[msg.sz] = 0;
 
-		for (ent = configs; ent; ent = ent->next) {
-			if (!kbd_eval(ent->kbd, msg.data))
+		for (auto ent = configs.get(); ent; ent = ent->next.get()) {
+			if (!kbd_eval(ent->kbd.get(), msg.data))
 				success = 1;
 		}
 
@@ -428,6 +425,7 @@ static int event_handler(struct event *ev)
 	static int last_time = 0;
 	static int timeout = 0;
 	struct key_event kev = {};
+	auto vkbd = ::vkbd.get();
 
 	timeout -= ev->timestamp - last_time;
 	last_time = ev->timestamp;

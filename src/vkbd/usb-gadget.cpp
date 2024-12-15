@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include "../keys.h"
 #include "usb-gadget.h"
+#include <memory>
 
 static uint8_t mods = 0;
 
@@ -19,6 +20,14 @@ static uint8_t keys[6] = {0};
 
 struct vkbd {
 	int fd;
+
+	vkbd() = default;
+	vkbd(const vkbd&) = delete;
+	vkbd& operator=(const vkbd&) = delete;
+	~vkbd()
+	{
+		close(fd);
+	}
 };
 
 struct hid_report {
@@ -126,9 +135,9 @@ static void update_key_state(uint16_t code, int state)
 	}
 }
 
-struct vkbd *vkbd_init(const char *name)
+std::shared_ptr<vkbd> vkbd_init(const char *name)
 {
-	struct vkbd *vkbd = (struct vkbd*)calloc(1, sizeof vkbd);
+	auto vkbd = std::make_shared<struct vkbd>();
 	vkbd->fd = create_virtual_keyboard();
 
 	return vkbd;
@@ -155,10 +164,4 @@ void vkbd_send_key(const struct vkbd *vkbd, uint8_t code, int state)
 		update_key_state(code, state);
 
 	send_hid_report(vkbd);
-}
-
-void free_vkbd(struct vkbd *vkbd)
-{
-	close(vkbd->fd);
-	free(vkbd);
 }

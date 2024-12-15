@@ -29,6 +29,15 @@
 struct vkbd {
 	int fd;
 	int pfd;
+
+	vkbd() = default;
+	vkbd(const vkbd&) = delete;
+	vkbd& operator=(const vkbd&) = delete;
+	~vkbd()
+	{
+		close(fd);
+		// close(pfd); // ???
+	}
 };
 
 static int create_virtual_keyboard(const char *name)
@@ -225,11 +234,11 @@ static void write_key_event(const struct vkbd *vkbd, uint8_t code, int state)
 	pthread_mutex_unlock(&mtx);
 }
 
-struct vkbd *vkbd_init(const char *name)
+std::shared_ptr<vkbd> vkbd_init(const char *name)
 {
 	pthread_t tid;
 
-	struct vkbd *vkbd = (struct vkbd*)calloc(1, sizeof vkbd);
+	auto vkbd = std::make_shared<struct vkbd>();
 	vkbd->fd = create_virtual_keyboard(name);
 	vkbd->pfd = create_virtual_pointer("keyd virtual pointer");
 
@@ -336,12 +345,4 @@ void vkbd_send_key(const struct vkbd *vkbd, uint8_t code, int state)
 	dbg("output %s %s", KEY_NAME(code), state == 1 ? "down" : "up");
 
 	write_key_event(vkbd, code, state);
-}
-
-void free_vkbd(struct vkbd *vkbd)
-{
-	if (vkbd) {
-		close(vkbd->fd);
-		free(vkbd);
-	}
 }
