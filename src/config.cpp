@@ -23,6 +23,7 @@
 #include "log.h"
 #include "strutil.h"
 #include "unicode.h"
+#include <limits>
 
 #define MAX_FILE_SZ 65536
 #define MAX_LINE_LEN 256
@@ -519,21 +520,16 @@ int parse_macro_expression(const char *s, struct macro *macro)
 	return macro_parse(ptr, macro) == 0 ? 0 : 1;
 }
 
-static int parse_command(const char *s, struct command *command)
+static int parse_command(const char *s, std::string& command)
 {
-	int len = strlen(s);
+	size_t len = strlen(s);
 
 	if (len == 0 || strstr(s, "command(") != s || s[len-1] != ')')
 		return -1;
 
-	if (len > (int)sizeof(command->cmd)) {
-		err("max command length (%ld) exceeded\n", sizeof(command->cmd));
-		return 1;
-	}
-
-	strcpy(command->cmd, s+8);
-	command->cmd[len-9] = 0;
-	str_escape(command->cmd);
+	command = s + 8;
+	command.pop_back(); // Remove )
+	command.resize(str_escape(command.data()));
 
 	return 0;
 }
@@ -548,7 +544,7 @@ static int parse_descriptor(char *s,
 	uint8_t code, mods;
 	int ret;
 	struct macro macro;
-	struct command cmd;
+	std::string cmd;
 
 	if (!s || !s[0]) {
 		d->op = OP_NULL;
@@ -582,36 +578,33 @@ static int parse_descriptor(char *s,
 		d->args[1].mods = mods;
 
 		return 0;
-	} else if ((ret=parse_command(s, &cmd)) >= 0) {
+	} else if ((ret = parse_command(s, cmd)) >= 0) {
 		if (ret) {
 			return -1;
 		}
 
-		if (config->nr_commands >= ARRAY_SIZE(config->commands)) {
-			err("max commands (%d), exceeded", ARRAY_SIZE(config->commands));
+		if (config->commands.size() >= std::numeric_limits<decltype(d->args[0].idx)>::max()) {
+			err("max commands exceeded");
 			return -1;
 		}
 
-
 		d->op = OP_COMMAND;
-		d->args[0].idx = config->nr_commands;
-
-		config->commands[config->nr_commands++] = cmd;
+		d->args[0].idx = config->commands.size();
+		config->commands.emplace_back(std::move(cmd));
 
 		return 0;
 	} else if ((ret=parse_macro_expression(s, &macro)) >= 0) {
 		if (ret)
 			return -1;
 
-		if (config->nr_macros >= ARRAY_SIZE(config->macros)) {
-			err("max macros (%d), exceeded", ARRAY_SIZE(config->macros));
+		if (config->macros.size() >= std::numeric_limits<decltype(d->args[0].idx)>::max()) {
+			err("max macros exceeded");
 			return -1;
 		}
 
 		d->op = OP_MACRO;
-		d->args[0].idx = config->nr_macros;
-
-		config->macros[config->nr_macros++] = macro;
+		d->args[0].idx = config->macros.size();
+		config->macros.emplace_back(std::move(macro));
 
 		return 0;
 	} else if (!parse_fn(s, &fn, args, &nargs)) {
@@ -703,18 +696,18 @@ static int parse_descriptor(char *s,
 						arg->timeout = atoi(argstr);
 						break;
 					case ARG_MACRO:
-						if (config->nr_macros >= ARRAY_SIZE(config->macros)) {
-							err("max macros (%d), exceeded", ARRAY_SIZE(config->macros));
+						if (config->macros.size() >= std::numeric_limits<decltype(arg->idx)>::max()) {
+							err("max macros exceeded");
 							return -1;
 						}
 
-						if (parse_macro_expression(argstr, &config->macros[config->nr_macros])) {
+						config->macros.emplace_back();
+						if (parse_macro_expression(argstr, &config->macros.back())) {
+							config->macros.pop_back();
 							return -1;
 						}
 
-						arg->idx = config->nr_macros;
-						config->nr_macros++;
-
+						arg->idx = config->macros.size() - 1;
 						break;
 					default:
 						assert(0);
@@ -895,8 +888,7 @@ static void config_init(struct config *config)
 {
 	size_t i;
 
-	memset(config, 0, sizeof *config);
-
+	*config = {};
 	char default_config[] =
 	"[aliases]\n"
 

@@ -8,6 +8,8 @@
 
 #include <limits.h>
 #include "macro.h"
+#include <vector>
+#include <string>
 
 #define MAX_LAYER_NAME_LEN	64
 #define MAX_DESCRIPTOR_ARGS	3
@@ -107,18 +109,14 @@ struct layer {
 	int constituents[8];
 };
 
-struct command {
-	char cmd[256];
-};
-
 struct config {
 	char path[PATH_MAX];
 	struct layer layers[MAX_LAYERS];
 
 	/* Auxiliary descriptors used by layer bindings. */
 	struct descriptor descriptors[1024];
-	struct macro macros[256];
-	struct command commands[64];
+	std::vector<macro> macros;
+	std::vector<std::string> commands;
 	char aliases[256][32];
 
 	uint8_t wildcard;
@@ -131,9 +129,7 @@ struct config {
 	size_t nr_ids;
 
 	size_t nr_layers;
-	size_t nr_macros;
 	size_t nr_descriptors;
-	size_t nr_commands;
 
 	long macro_timeout;
 	long macro_sequence_timeout;
