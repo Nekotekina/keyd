@@ -168,8 +168,6 @@ causing _hjkl_ to function as the corresponding arrow keys.
 Unlike most other remapping tools, keyd provides first class support for
 modifiers. A layer name may optionally end with a ':' followed by a
 set of modifiers to emulate in the absence of an explicit mapping.
-*Layer names may consist of a maximum of 64 characters* (including
-all modifiers).
 
 These layers play nicely with other modifiers and preserve existing stacking
 semantics.
@@ -726,7 +724,7 @@ A key may optionally be bound to an _action_ which accepts zero or more argument
 		  and there are no intervening key taps.
 
 	This reduces the visual latency by immediately resolving the key as a letter when
-	typed midword, but also facilitates its use as a layer trigger if it is held for a long 
+	typed midword, but also facilitates its use as a layer trigger if it is held for a long
 	enough period with no intervening symbols.
 
 	Since this is a common usecase, a macro called *lettermod* (defined below) has been

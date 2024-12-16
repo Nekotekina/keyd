@@ -11,7 +11,6 @@
 #include <vector>
 #include <string>
 
-#define MAX_LAYER_NAME_LEN	64
 #define MAX_DESCRIPTOR_ARGS	3
 
 #define MAX_EXP_LEN		512
@@ -81,14 +80,14 @@ struct chord {
  * layers consisting of the corresponding modifier and an empty keymap.
  */
 
-enum layer_type_e {
+enum layer_type_e : short {
 	LT_NORMAL,
 	LT_LAYOUT,
 	LT_COMPOSITE,
 };
 
 struct layer {
-	char name[MAX_LAYER_NAME_LEN+1];
+	std::string name;
 
 	enum layer_type_e type;
 
@@ -136,12 +135,11 @@ struct config {
 
 	uint8_t layer_indicator;
 	uint8_t disable_modifier_guard;
-	char default_layout[MAX_LAYER_NAME_LEN];
+	std::string default_layout;
 };
 
 int config_parse(struct config *config, const char *path);
 int config_add_entry(struct config *config, const char *exp);
-int config_get_layer_index(const struct config *config, const char *name);
 
 int config_check_match(struct config *config, const char *id, uint8_t flags);
 
