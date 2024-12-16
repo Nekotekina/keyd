@@ -2,6 +2,10 @@
 #include <memory>
 #include <utility>
 
+#ifndef CONFIG_DIR
+#define CONFIG_DIR ""
+#endif
+
 struct config_ent {
 	struct config config = {};
 	std::unique_ptr<keyboard> kbd;
@@ -128,6 +132,10 @@ static void add_listener(int con)
 
 static void activate_leds(const struct keyboard *kbd)
 {
+	int ind = kbd->config.layer_indicator;
+	if (ind > LED_MAX)
+		return;
+
 	int active_layers = 0;
 
 	for (size_t i = 1; i < kbd->config.layers.size(); i++)
@@ -137,13 +145,28 @@ static void activate_leds(const struct keyboard *kbd)
 		}
 
 	for (size_t i = 0; i < device_table_sz; i++)
-		if (device_table[i].data == kbd)
-			device_set_led(&device_table[i], 1, active_layers);
+		if (device_table[i].data == kbd && (device_table[i].capabilities & CAP_LEDS)) {
+			if (std::exchange(device_table[i].led_state[ind], active_layers) == active_layers)
+				continue;
+			device_set_led(&device_table[i], ind, active_layers);
+		}
+}
+
+static void restore_leds()
+{
+	for (size_t i = 0; i < device_table_sz; i++) {
+		struct device* dev = &device_table[i];
+		if (dev->grabbed && dev->data && (dev->capabilities & CAP_LEDS)) {
+			for (int j = 0; j < LED_CNT; j++) {
+				device_set_led(dev, dev->led_state[j], j);
+			}
+		}
+	}
 }
 
 static void on_layer_change(const struct keyboard *kbd, const struct layer *layer, uint8_t state)
 {
-	if (kbd->config.layer_indicator) {
+	if (kbd->config.layer_indicator <= LED_MAX) {
 		activate_leds(kbd);
 	}
 
@@ -249,6 +272,8 @@ static void manage_device(struct device *dev)
 			  dev->id, ent->config.pathstr.c_str(), dev->name);
 
 		dev->data = ent->kbd.get();
+		if (dev->capabilities & CAP_LEDS)
+			device_set_led(dev, ent->kbd->config.layer_indicator, 0);
 	} else {
 		dev->data = NULL;
 		device_ungrab(dev);
@@ -258,12 +283,11 @@ static void manage_device(struct device *dev)
 
 static void reload()
 {
-	size_t i;
-
+	restore_leds();
 	configs.reset();
 	load_configs();
 
-	for (i = 0; i < device_table_sz; i++)
+	for (size_t i = 0; i < device_table_sz; i++)
 		manage_device(&device_table[i]);
 
 	clear_vkbd();
@@ -498,6 +522,14 @@ static int event_handler(struct event *ev)
 			case DEV_MOUSE_MOVE_ABS:
 				vkbd_mouse_move_abs(vkbd, ev->devev->x, ev->devev->y);
 				break;
+			case DEV_LED:
+				if (ev->devev->code <= LED_MAX) {
+					ev->dev->led_state[ev->devev->code] = ev->devev->pressed;
+					// Restore layer indicator state
+					if (ev->devev->code == kbd->config.layer_indicator)
+						activate_leds(kbd);
+				}
+				break;
 			default:
 				break;
 			case DEV_MOUSE_SCROLL:
@@ -526,13 +558,25 @@ static int event_handler(struct event *ev)
 			 * Propagate LED events received by the virtual device from userspace
 			 * to all grabbed devices.
 			 */
-			for (i = 0; i < device_table_sz; i++)
-				if (device_table[i].data) {
-					struct keyboard* kbd = (struct keyboard*)device_table[i].data;
-					if (ev->devev->code == 1 && kbd->config.layer_indicator)
+			for (i = 0; i < device_table_sz; i++) {
+				::device& dev = device_table[i];
+				if (dev.data && (dev.capabilities & CAP_LEDS)) {
+					struct keyboard* kbd = (struct keyboard*)dev.data;
+					if (ev->devev->code <= LED_MAX) {
+						// Save LED state for restoring it later
+						auto prev = std::exchange(dev.led_state[ev->devev->code], ev->devev->pressed);
+						if (prev == ev->devev->pressed)
+							continue;
+					}
+					if (ev->devev->code == kbd->config.layer_indicator) {
+						// Suppress indicator change
 						continue;
-					device_set_led(&device_table[i], ev->devev->code, ev->devev->pressed);
+					}
+					device_set_led(&dev, ev->devev->code, ev->devev->pressed);
 				}
+
+			}
+			break;
 		}
 
 		break;
@@ -557,14 +601,6 @@ static int event_handler(struct event *ev)
 	default:
 		break;
 	}
-
-	size_t i;
-	for (i = 0; i < device_table_sz; i++)
-		if (device_table[i].data) {
-			struct keyboard* kbd = (struct keyboard*)device_table[i].data;
-			if (kbd->config.layer_indicator)
-				activate_leds(kbd);
-		}
 
 	return timeout;
 }

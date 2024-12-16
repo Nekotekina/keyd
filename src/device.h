@@ -11,6 +11,7 @@
 #define CAP_MOUSE	0x1
 #define CAP_MOUSE_ABS	0x2
 #define CAP_KEYBOARD	0x4
+#define CAP_LEDS	0x8
 
 #define MAX_DEVICES	64
 
@@ -24,6 +25,8 @@ struct device {
 	uint8_t grabbed;
 	uint8_t capabilities;
 	uint8_t is_virtual;
+
+	uint8_t led_state[LED_CNT];
 
 	char id[64];
 	char name[64];
@@ -69,6 +72,6 @@ int device_ungrab(struct device *dev);
 
 int devmon_create();
 int devmon_read_device(int fd, struct device *dev);
-void device_set_led(const struct device *dev, int led, int state);
+void device_set_led(const struct device *dev, uint8_t led, int state);
 
 #endif
