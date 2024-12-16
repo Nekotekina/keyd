@@ -10,6 +10,7 @@
 #include "macro.h"
 #include <vector>
 #include <string>
+#include <array>
 
 #define MAX_DESCRIPTOR_ARGS	3
 
@@ -107,10 +108,10 @@ struct config {
 	std::vector<layer> layers;
 
 	/* Auxiliary descriptors used by layer bindings. */
-	struct descriptor descriptors[1024];
+	std::vector<descriptor> descriptors;
 	std::vector<macro> macros;
 	std::vector<std::string> commands;
-	char aliases[256][32];
+	std::array<std::string, 256> aliases;
 
 	uint8_t wildcard;
 	struct {
@@ -118,10 +119,7 @@ struct config {
 		uint8_t flags;
 	} ids[64];
 
-
 	size_t nr_ids;
-
-	size_t nr_descriptors;
 
 	long macro_timeout;
 	long macro_sequence_timeout;

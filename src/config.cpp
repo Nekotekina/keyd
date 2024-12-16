@@ -245,7 +245,6 @@ static int set_layer_entry(const struct config *config,
 			   struct layer *layer, char *key,
 			   const struct descriptor *d)
 {
-	size_t i;
 	int found = 0;
 
 	if (strchr(key, '+')) {
@@ -288,8 +287,8 @@ static int set_layer_entry(const struct config *config,
 			layer->nr_chords++;
 		}
 	} else {
-		for (i = 0; i < 256; i++) {
-			if (!strcmp(config->aliases[i], key)) {
+		for (size_t i = 0; i < config->aliases.size(); i++) {
+			if (config->aliases[i] == key) {
 				layer->keymap[i] = *d;
 				found = 1;
 			}
@@ -668,13 +667,13 @@ static int parse_descriptor(char *s,
 						if (parse_descriptor(argstr, &desc, config))
 							return -1;
 
-						if (config->nr_descriptors >= ARRAY_SIZE(config->descriptors)) {
+						if (config->descriptors.size() >= std::numeric_limits<decltype(arg->idx)>::max()) {
 							err("maximum descriptors exceeded");
 							return -1;
 						}
 
-						config->descriptors[config->nr_descriptors] = desc;
-						arg->idx = config->nr_descriptors++;
+						arg->idx = config->descriptors.size();
+						config->descriptors.emplace_back(std::move(desc));
 						break;
 					case ARG_SENSITIVITY:
 						arg->sensitivity = atoi(argstr);
@@ -790,11 +789,7 @@ static void parse_alias_section(struct config *config, struct ini_section *secti
 		const char *name = ent->val;
 
 		if ((code = lookup_keycode(ent->key))) {
-			ssize_t len = strlen(name);
-
-			if (len >= (ssize_t)sizeof(config->aliases[0])) {
-				warn("%s exceeds the maximum alias length (%ld)", name, sizeof(config->aliases[0])-1);
-			} else {
+			if (name && name[0]) {
 				uint8_t alias_code;
 
 				if ((alias_code = lookup_keycode(name))) {
@@ -805,7 +800,7 @@ static void parse_alias_section(struct config *config, struct ini_section *secti
 					d->args[1].mods = 0;
 				}
 
-				strcpy(config->aliases[code], name);
+				config->aliases[code] = name;
 			}
 		} else {
 			warn("failed to define alias %s, %s is not a valid keycode", name, ent->key);
