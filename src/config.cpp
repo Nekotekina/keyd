@@ -25,9 +25,16 @@
 #include "unicode.h"
 #include <limits>
 #include <string>
+#include <string_view>
+#include <ranges>
+#include <span>
 
 #define MAX_FILE_SZ 65536
 #define MAX_LINE_LEN 256
+
+#ifndef DATA_DIR
+#define DATA_DIR
+#endif
 
 #undef warn
 #define warn(fmt, ...) keyd_log("\ty{WARNING:} " fmt "\n", ##__VA_ARGS__)
@@ -83,6 +90,7 @@ static struct {
 	{ "swap2", 	"swapm",	OP_SWAPM,			{ ARG_LAYER, ARG_MACRO } },
 };
 
+int config_get_layer_index(const struct config *config, std::string_view name);
 
 static const char *resolve_include_path(const char *path, const char *include_path)
 {
@@ -305,36 +313,35 @@ static int set_layer_entry(const struct config *config,
 	return 0;
 }
 
-static int new_layer(char *s, const struct config *config, struct layer *layer)
+static int new_layer(std::string_view s, const struct config *config, struct layer *layer)
 {
 	uint8_t mods;
-	char *name;
-	char *type;
+	std::string_view name, type;
 
-	name = strtok(s, ":");
-	type = strtok(NULL, ":");
+	name = s.substr(0, s.find_first_of(":"));
+	if (name != s)
+		type = s.substr(name.size() + 1);
 
-	strcpy(layer->name, name);
-
+	layer->name = name;
 	layer->nr_chords = 0;
 
-	if (strchr(name, '+')) {
-		char *layername;
+	if (name.find_first_of("+") + 1 /* Found */) {
 		int n = 0;
 
 		layer->type = LT_COMPOSITE;
 		layer->nr_constituents = 0;
 
-		if (type) {
+		if (!type.empty()) {
 			err("composite layers cannot have a type.");
 			return -1;
 		}
 
-		for (layername = strtok(name, "+"); layername; layername = strtok(NULL, "+")) {
+		for (std::span<const char> range : std::ranges::split_view(name, '+')) {
+			const std::string_view layername(range.data(), range.size());
 			int idx = config_get_layer_index(config, layername);
 
 			if (idx < 0) {
-				err("%s is not a valid layer", layername);
+				err("%s is not a valid layer", std::string(layername).c_str());
 				return -1;
 			}
 
@@ -346,14 +353,14 @@ static int new_layer(char *s, const struct config *config, struct layer *layer)
 			layer->constituents[layer->nr_constituents++] = idx;
 		}
 
-	} else if (type && !strcmp(type, "layout")) {
-			layer->type = LT_LAYOUT;
-	} else if (type && !parse_modset(type, &mods)) {
-			layer->type = LT_NORMAL;
-			layer->mods = mods;
+	} else if (!type.empty() && type == "layout") {
+		layer->type = LT_LAYOUT;
+	} else if (!type.empty() && !parse_modset(type.data() /* Must be NTS */, &mods)) {
+		layer->type = LT_NORMAL;
+		layer->mods = mods;
 	} else {
-		if (type)
-			warn("\"%s\" is not a valid layer type, ignoring\n", type);
+		if (!type.empty())
+			warn("\"%s\" is not a valid layer type, ignoring\n", std::string(type).c_str());
 
 		layer->type = LT_NORMAL;
 		layer->mods = 0;
@@ -372,23 +379,13 @@ static int new_layer(char *s, const struct config *config, struct layer *layer)
 static int config_add_layer(struct config *config, const char *s)
 {
 	int ret;
-	char buf[MAX_LAYER_NAME_LEN+1];
-	char *name;
+	std::string_view name = s;
 
-	if (strlen(s) >= sizeof buf) {
-		err("%s exceeds maximum section length (%d) (ignoring)", s, MAX_LAYER_NAME_LEN);
-		return -1;
-	}
+	if (config_get_layer_index(config, name.substr(0, name.find_first_of(":"))) != -1)
+		return 1;
 
-	strcpy(buf, s);
-	name = strtok(buf, ":");
-
-	if (config_get_layer_index(config, name) != -1)
-			return 1;
-
-	strcpy(buf, s);
 	::layer new_layer = {};
-	ret = ::new_layer(buf, config, &new_layer);
+	ret = ::new_layer(name, config, &new_layer);
 
 	if (ret < 0)
 		return -1;
@@ -732,8 +729,7 @@ static void parse_global_section(struct config *config, struct ini_section *sect
 		else if (!strcmp(ent->key, "chord_timeout"))
 			config->chord_interkey_timeout = atoi(ent->val);
 		else if (!strcmp(ent->key, "default_layout"))
-			snprintf(config->default_layout, sizeof config->default_layout,
-				 "%s", ent->val);
+			config->default_layout = ent->val;
 		else if (!strcmp(ent->key, "macro_repeat_timeout"))
 			config->macro_repeat_timeout = atoi(ent->val);
 		else if (!strcmp(ent->key, "layer_indicator"))
@@ -947,15 +943,15 @@ int config_check_match(struct config *config, const char *id, uint8_t flags)
 	return config->wildcard ? 1 : 0;
 }
 
-int config_get_layer_index(const struct config *config, const char *name)
+int config_get_layer_index(const struct config *config, std::string_view name)
 {
 	size_t i;
 
-	if (!name)
+	if (name.empty())
 		return -1;
 
 	for (i = 0; i < config->layers.size(); i++)
-		if (!strcmp(config->layers[i].name, name))
+		if (config->layers[i].name == name)
 			return i;
 
 	return -1;

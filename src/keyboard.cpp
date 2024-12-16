@@ -243,7 +243,7 @@ static void lookup_descriptor(struct keyboard *kbd, uint8_t code,
 
 static void deactivate_layer(struct keyboard *kbd, int idx)
 {
-	dbg("Deactivating layer %s", kbd->config.layers[idx].name);
+	dbg("Deactivating layer %s", kbd->config.layers[idx].name.c_str());
 
 	assert(kbd->layer_state[idx].active > 0);
 	kbd->layer_state[idx].active--;
@@ -258,7 +258,7 @@ static void deactivate_layer(struct keyboard *kbd, int idx)
 
 static void activate_layer(struct keyboard *kbd, uint8_t code, int idx)
 {
-	dbg("Activating layer %s", kbd->config.layers[idx].name);
+	dbg("Activating layer %s", kbd->config.layers[idx].name.c_str());
 	struct cache_entry *ce;
 
 	kbd->layer_state[idx].activation_time = get_time();
@@ -815,9 +815,7 @@ std::unique_ptr<keyboard> new_keyboard(struct config *config, const struct outpu
 		for (i = 0; i < kbd->config.layers.size(); i++) {
 			struct layer *layer = &kbd->config.layers[i];
 
-			if (layer->type == LT_LAYOUT &&
-			    !strcmp(layer->name,
-				    kbd->config.default_layout)) {
+			if (layer->type == LT_LAYOUT && layer->name == kbd->config.default_layout) {
 				kbd->layer_state[i].active = 1;
 				kbd->layer_state[i].activation_time = 1;
 				found = 1;
@@ -827,7 +825,7 @@ std::unique_ptr<keyboard> new_keyboard(struct config *config, const struct outpu
 
 		if (!found)
 			keyd_log("\tWARNING: could not find default layout %s.\n",
-				kbd->config.default_layout);
+				kbd->config.default_layout.c_str());
 	}
 
 	kbd->chord.queue_sz = 0;

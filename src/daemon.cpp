@@ -80,7 +80,7 @@ static void add_listener(int con)
 				struct layer *layer = &config->layers[i];
 
 				write(con, layer->type == LT_LAYOUT ? "/" : "+", 1);
-				write(con, layer->name, strlen(layer->name));
+				write(con, layer->name.c_str(), layer->name.size());
 				write(con, "\n", 1);
 			}
 		}
@@ -106,8 +106,7 @@ static void activate_leds(const struct keyboard *kbd)
 static void on_layer_change(const struct keyboard *kbd, const struct layer *layer, uint8_t state)
 {
 	size_t i;
-	char buf[MAX_LAYER_NAME_LEN+2];
-	ssize_t bufsz;
+	std::string buf = "/" + layer->name + "\n";
 
 	int keep[ARRAY_SIZE(listeners)];
 	size_t n = 0;
@@ -119,15 +118,13 @@ static void on_layer_change(const struct keyboard *kbd, const struct layer *laye
 	if (!nr_listeners)
 		return;
 
-	if (layer->type == LT_LAYOUT)
-		bufsz = snprintf(buf, sizeof(buf), "/%s\n", layer->name);
-	else
-		bufsz = snprintf(buf, sizeof(buf), "%c%s\n", state ? '+' : '-', layer->name);
+	if (layer->type != LT_LAYOUT)
+		buf[0] = state ? '+' : '-';
 
 	for (i = 0; i < nr_listeners; i++) {
-		ssize_t nw = write(listeners[i], buf, bufsz);
+		size_t nw = write(listeners[i], buf.c_str(), buf.size());
 
-		if (nw == bufsz)
+		if (nw == buf.size())
 			keep[n++] = listeners[i];
 		else
 			close(listeners[i]);
