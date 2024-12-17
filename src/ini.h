@@ -7,9 +7,8 @@
 #define INI_H
 
 #include <stdint.h>
-
-#define MAX_SECTIONS 32
-#define MAX_SECTION_ENTRIES 1024
+#include <vector>
+#include <string>
 
 struct ini_entry {
 	char *key;
@@ -19,19 +18,12 @@ struct ini_entry {
 };
 
 struct ini_section {
-	char name[256];
-
-	size_t nr_entries;
 	size_t lnum;
-
-	struct ini_entry entries[MAX_SECTION_ENTRIES];
+	std::string name;
+	std::vector<ini_entry> entries;
 };
 
-struct ini {
-	size_t nr_sections;
-
-	struct ini_section sections[MAX_SECTIONS];
-};
+using ini = std::vector<ini_section>;
 
 /*
  * Reads a string of the form:
@@ -61,7 +53,7 @@ struct ini {
  *  freed.
  */
 
-struct ini *ini_parse_string(char *s, const char *default_section_name);
+ini ini_parse_string(char *s, const char *default_section_name);
 
 void parse_kvp(char *s, char **key, char **value);
 

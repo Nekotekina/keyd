@@ -26,9 +26,8 @@
 #include <limits>
 #include <string>
 #include <string_view>
-
-#define MAX_FILE_SZ 65536
-#define MAX_LINE_LEN 256
+#include <iostream>
+#include <fstream>
 
 #ifndef DATA_DIR
 #define DATA_DIR
@@ -90,14 +89,14 @@ static struct {
 
 int config_get_layer_index(const struct config *config, std::string_view name);
 
-static const char *resolve_include_path(const char *path, const char *include_path)
+static std::string resolve_include_path(const char *path, std::string_view include_path)
 {
-	static std::string resolved_path;
+	std::string resolved_path;
 	std::string tmp;
 
-	if (strstr(include_path, ".")) {
-		warn("%s: included files may not have a file extension", include_path);
-		return NULL;
+	if (include_path.ends_with(".conf")) {
+		warn("%s: included file has invalid extension", include_path.data());
+		return {};
 	}
 
 	tmp = path;
@@ -114,82 +113,48 @@ static const char *resolve_include_path(const char *path, const char *include_pa
 	if (!access(resolved_path.c_str(), F_OK))
 		return resolved_path.c_str();
 
-	return NULL;
+	return resolved_path;
 }
 
-static char *read_file(const char *path)
+static std::string read_file(const char *path)
 {
-	const char include_prefix[] = "include ";
+	constexpr std::string_view include_prefix = "include ";
 
-	static char buf[MAX_FILE_SZ];
-	char line[MAX_LINE_LEN+1];
-	int sz = 0;
+	std::string buf, line;
 
-	FILE *fh = fopen(path, "r");
-	if (!fh) {
+	std::ifstream file(path);
+	if (!file.is_open()) {
 		err("failed to open %s", path);
-		return NULL;
+		return {};
 	}
 
-	while (fgets(line, sizeof line, fh)) {
-		int len = strlen(line);
+	while (std::getline(file, line)) {
+		if (line.starts_with(include_prefix)) {
+			std::string_view include_path = line;
+			include_path.remove_prefix(include_prefix.size());
+			while (include_path.starts_with(' '))
+				include_path.remove_prefix(1);
 
-		if (line[len-1] != '\n') {
-			if (len >= MAX_LINE_LEN) {
-				err("maximum line length exceed (%d)", MAX_LINE_LEN);
-				goto fail;
-			} else {
-				line[len++] = '\n';
-			}
-		}
-
-		if ((len+sz) > MAX_FILE_SZ) {
-			err("maximum file size exceed (%d)", MAX_FILE_SZ);
-			goto fail;
-		}
-
-		if (strstr(line, include_prefix) == line) {
-			int fd;
-			const char *resolved_path;
-			char *include_path = line+sizeof(include_prefix)-1;
-
-			line[len-1] = 0;
-
-			while (include_path[0] == ' ')
-				include_path++;
-
-			resolved_path = resolve_include_path(path, include_path);
-
-			if (!resolved_path) {
-				warn("failed to resolve include path: %s", include_path);
+			auto resolved_path = resolve_include_path(path, include_path);
+			if (resolved_path.empty()) {
+				warn("failed to resolve include path: %s", include_path.data());
 				continue;
 			}
 
-			fd = open(resolved_path, O_RDONLY);
-
-			if (fd < 0) {
-				warn("failed to include %s", include_path);
+			std::ifstream file(resolved_path);
+			if (!file.is_open()) {
+				warn("failed to %s", line.c_str());
 				perror("open");
 			} else {
-				int n;
-				while ((n = read(fd, buf+sz, sizeof(buf)-sz)) > 0)
-					sz += n;
-				close(fd);
+				buf.append(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
 			}
 		} else {
-			strcpy(buf+sz, line);
-			sz += len;
+			buf += line;
+			buf += '\n';
 		}
 	}
 
-	fclose(fh);
-
-	buf[sz] = 0;
 	return buf;
-
-fail:
-	fclose(fh);
-	return NULL;
 }
 
 
@@ -362,10 +327,9 @@ static int new_layer(std::string_view s, const struct config *config, struct lay
  * 	0 if the layer was created successfully
  * 	< 0 on error
  */
-static int config_add_layer(struct config *config, const char *s)
+static int config_add_layer(struct config *config, std::string_view name)
 {
 	int ret;
-	std::string_view name = s;
 
 	if (config_get_layer_index(config, name.substr(0, name.find_first_of(":"))) != -1)
 		return 1;
@@ -467,20 +431,11 @@ int parse_macro_expression(const char *s, macro& macro)
 {
 	uint8_t code, mods;
 
-	size_t len = strlen(s);
+	std::string buf = s;
+	auto ptr = buf.data();
 
-	char buf[1024];
-	char *ptr = buf;
-
-	if (len >= sizeof(buf)) {
-		err("macro size exceeded maximum size (%ld)\n", sizeof(buf));
-		return -1;
-	}
-
-	strcpy(buf, s);
-
-	if (!strncmp(ptr, "macro(", 6) && ptr[len-1] == ')') {
-		ptr[len-1] = 0;
+	if (buf.starts_with("macro(") && buf.ends_with(')')) {
+		buf.pop_back();
 		ptr += 6;
 		str_escape(ptr);
 	} else if (parse_key_sequence(ptr, &code, &mods) && utf8_strlen(ptr) != 1) {
@@ -582,19 +537,16 @@ static int parse_descriptor(char *s,
 		int i;
 
 		if (!strcmp(fn, "lettermod")) {
-			char buf[1024];
+			std::string buf;
 
 			if (nargs != 4) {
 				err("%s requires 4 arguments", fn);
 				return -1;
 			}
 
-			snprintf(buf, sizeof buf,
-				"overloadi(%s, overloadt2(%s, %s, %s), %s)",
-				args[1], args[0], args[1], args[3], args[2]);
-
-			if (parse_fn(buf, &fn, args, &nargs)) {
-				err("failed to parse %s", buf);
+			buf = buf + "overloadi(" + args[1] + ", overloadt2(" + args[0] + ", " + args[1] + ", " + args[3] + "), " + args[2] + ")";
+			if (parse_fn(buf.data(), &fn, args, &nargs)) {
+				err("failed to parse %s", buf.c_str());
 				return -1;
 			}
 		}
@@ -697,9 +649,7 @@ static int parse_descriptor(char *s,
 
 static void parse_global_section(struct config *config, struct ini_section *section)
 {
-	size_t i;
-
-	for (i = 0; i < section->nr_entries;i++) {
+	for (size_t i = 0; i < section->entries.size(); i++) {
 		struct ini_entry *ent = &section->entries[i];
 
 		if (!strcmp(ent->key, "macro_timeout"))
@@ -729,8 +679,7 @@ static void parse_global_section(struct config *config, struct ini_section *sect
 
 static void parse_id_section(struct config *config, struct ini_section *section)
 {
-	size_t i;
-	for (i = 0; i < section->nr_entries; i++) {
+	for (size_t i = 0; i < section->entries.size(); i++) {
 		uint16_t product, vendor;
 
 		struct ini_entry *ent = &section->entries[i];
@@ -768,7 +717,7 @@ static void parse_alias_section(struct config *config, struct ini_section *secti
 {
 	size_t i;
 
-	for (i = 0; i < section->nr_entries; i++) {
+	for (i = 0; i < section->entries.size(); i++) {
 		uint8_t code;
 		struct ini_entry *ent = &section->entries[i];
 		const char *name = ent->val;
@@ -797,21 +746,23 @@ static void parse_alias_section(struct config *config, struct ini_section *secti
 static int config_parse_string(struct config *config, char *content)
 {
 	size_t i;
-	struct ini *ini;
-
-	if (!(ini = ini_parse_string(content, NULL)))
+	::ini ini = ini_parse_string(content, NULL);
+	if (ini.empty())
 		return -1;
 
 	/* First pass: create all layers based on section headers.  */
-	for (i = 0; i < ini->nr_sections; i++) {
-		struct ini_section *section = &ini->sections[i];
+	for (i = 0; i < ini.size(); i++) {
+		struct ini_section *section = &ini[i];
 
-		if (!strcmp(section->name, "ids")) {
+		if (section->name == "ids") {
 			parse_id_section(config, section);
-		} else if (!strcmp(section->name, "aliases")) {
+			section->lnum = -1;
+		} else if (section->name == "aliases") {
 			parse_alias_section(config, section);
-		} else if (!strcmp(section->name, "global")) {
+			section->lnum = -1;
+		} else if (section->name == "global") {
 			parse_global_section(config, section);
+			section->lnum = -1;
 		} else {
 			if (config_add_layer(config, section->name) < 0)
 				warn("%s", errstr);
@@ -819,30 +770,27 @@ static int config_parse_string(struct config *config, char *content)
 	}
 
 	/* Populate each layer. */
-	for (i = 0; i < ini->nr_sections; i++) {
-		size_t j;
-		char *layername;
-		struct ini_section *section = &ini->sections[i];
+	for (i = 0; i < ini.size(); i++) {
+		struct ini_section *section = &ini[i];
+		std::string_view layer_name = section->name;
+		layer_name = layer_name.substr(0, layer_name.find_first_of(':'));
 
-		if (!strcmp(section->name, "ids") ||
-		    !strcmp(section->name, "aliases") ||
-		    !strcmp(section->name, "global"))
+		if (section->lnum == size_t(-1))
 			continue;
 
-		layername = strtok(section->name, ":");
-
-		for (j = 0; j < section->nr_entries;j++) {
-			char entry[MAX_EXP_LEN];
+		for (size_t j = 0; j < section->entries.size(); j++) {
 			struct ini_entry *ent = &section->entries[j];
-
 			if (!ent->val) {
 				warn("invalid binding on line %zd", ent->lnum);
 				continue;
 			}
 
-			snprintf(entry, sizeof entry, "%s.%s = %s", layername, ent->key, ent->val);
-
-			if (config_add_entry(config, entry) < 0)
+			std::string entry(layer_name);
+			entry += ".";
+			entry += ent->key;
+			entry += " = ";
+			entry += ent->val;
+			if (config_add_entry(config, entry.c_str()) < 0)
 				keyd_log("\tr{ERROR:} line m{%zd}: %s\n", ent->lnum, errstr);
 		}
 	}
@@ -897,14 +845,13 @@ static void config_init(struct config *config)
 
 int config_parse(struct config *config, const char *path)
 {
-	char *content;
-
-	if (!(content = read_file(path)))
+	std::string content = read_file(path);
+	if (content.empty())
 		return -1;
 
 	config_init(config);
 	config->pathstr = path;
-	return config_parse_string(config, content);
+	return config_parse_string(config, content.data());
 }
 
 int config_check_match(struct config *config, const char *id, uint8_t flags)
@@ -951,15 +898,8 @@ int config_add_entry(struct config *config, const char *exp)
 	struct layer *layer;
 	int idx;
 
-	static char buf[MAX_EXP_LEN];
-
-	if (strlen(exp) >= MAX_EXP_LEN) {
-		err("%s exceeds maximum expression length (%d)", exp, MAX_EXP_LEN);
-		return -1;
-	}
-
-	strcpy(buf, exp);
-	s = buf;
+	std::string buf = exp;
+	s = buf.data();
 
 	dot = strchr(s, '.');
 	paren = strchr(s, '(');

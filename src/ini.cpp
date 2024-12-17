@@ -14,7 +14,6 @@
 #include <assert.h>
 
 #include "ini.h"
-#define MAX_INI_SIZE 65536
 
 /*
  * Parse a value of the form 'key = value'. The value may contain =
@@ -66,9 +65,9 @@ void parse_kvp(char *s, char **key, char **value)
  * returned ini struct is no longer required.
  */
 
-struct ini *ini_parse_string(char *s, const char *default_section_name)
+::ini ini_parse_string(char *s, const char *default_section_name)
 {
-	static struct ini ini;
+	::ini ini;
 
 	int ln = 0;
 	size_t n = 0;
@@ -107,16 +106,11 @@ struct ini *ini_parse_string(char *s, const char *default_section_name)
 		switch (line[0]) {
 		case '[':
 			if (line[len-1] == ']') {
-				assert(n < MAX_SECTIONS);
-
-				section = &ini.sections[n++];
+				section = &ini.emplace_back();
 
 				line[len-1] = 0;
-
-				strncpy(section->name, line+1, sizeof(section->name));
-				section->nr_entries = 0;
+				section->name = line + 1;
 				section->lnum = ln;
-
 				continue;
 			}
 
@@ -126,23 +120,18 @@ struct ini *ini_parse_string(char *s, const char *default_section_name)
 		}
 
 		if (!section) {
-			if(default_section_name) {
-				section = &ini.sections[n++];
-				strcpy(section->name, default_section_name);
-
-				section->nr_entries = 0;
+			if (default_section_name) {
+				section = &ini.emplace_back();
+				section->name = default_section_name;
 				section->lnum = 0;
 			} else
-				return NULL;
+				return {};
 		}
 
-		assert(section->nr_entries < MAX_SECTION_ENTRIES);
-
-		ent = &section->entries[section->nr_entries++];
+		ent = &section->entries.emplace_back();
 		parse_kvp(line, &ent->key, &ent->val);
 		ent->lnum = ln;
 	}
 
-	ini.nr_sections = n;
-	return &ini;
+	return ini;
 }
