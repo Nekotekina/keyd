@@ -14,8 +14,6 @@
 
 #define MAX_DESCRIPTOR_ARGS	3
 
-#define MAX_EXP_LEN		512
-
 #define ID_EXCLUDED	1
 #define ID_MOUSE	2
 #define ID_KEYBOARD	4
