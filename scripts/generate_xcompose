@@ -2,19 +2,6 @@
 
 import sys
 
-codes = []
-for line in open('data/unicode.txt').readlines(): # Original source: https://www.unicode.org/Public/14.0.0/ucd/UnicodeData.txt
-    try:
-        code = int(line.split(';')[0], 16)
-
-        # Ensure the character is encodable (surrogates are not)
-        chr(code).encode('utf8')
-
-        if (code >= 128):
-            codes.append(code)
-    except:
-        pass
-
 # We use the base36 encoded index as the compose sequence to minimize
 # the total number of keysyms required.
 def base36(n):
@@ -28,13 +15,29 @@ def base36(n):
 
 	return s
 
-# Generate the compose file
-
+codes = []
+codes2 = []
 data = ''
-for n, code in enumerate(codes):
+index = 0
+for line in open('data/unicode.txt').readlines(): # Original source: https://www.unicode.org/Public/14.0.0/ucd/UnicodeData.txt
+    try:
+        code = int(line.split(';')[0], 16)
+
+        # Ensure the character is encodable (surrogates are not)
+        chr(code).encode('utf8')
+
+        if ((code >= 128) and (code < 65536)):
+            codes.append(code)
+        elif (code >= 65536):
+            codes2.append(code)
+        else:
+            continue
         data += '<Cancel> '
-        data += ' '.join(f'<{c}>' for c in base36(n))
+        data += ' '.join(f'<{c}>' for c in base36(index))
         data += f' : "{chr(code)}"\n'
+        index += 1
+    except:
+        pass
 
 open('data/keyd.compose', 'w').write(data)
 
@@ -50,17 +53,58 @@ open('src/unicode.cpp', 'w').write(f'''
 	#include <stdint.h>
 	#include <stdlib.h>
 	#include "keys.h"
+	#include <algorithm>
+	#include <vector>
+	#include <utility>
+	#include <numeric>
+	#include <tuple>
 
-	uint32_t unicode_table[] = {{ {','.join(map(str, codes))} }};
+	constexpr uint16_t unicode_table1[] = {{ {','.join(map(str, codes))} }};
+	constexpr uint32_t unicode_table2[] = {{ {','.join(map(str, codes2))} }};
+
+	// Compile time binary search assistant that will generate some branches to reduce search range
+	template <typename T, const T* const& Begin, const T* const& End, size_t Max>
+	static std::pair<const T*, const T*> lookup_range(uint32_t codepoint)
+	{{
+		if constexpr (size_t(End - Begin) <= Max) {{
+			return std::make_pair(Begin, End);
+		}} else {{
+			static constexpr auto Mid = std::midpoint(Begin, End);
+			if (codepoint < 0u + *Mid)
+				return lookup_range<T, Begin, Mid, Max>(codepoint);
+			else
+				return lookup_range<T, Mid, End, Max>(codepoint);
+		}}
+	}}
 
 	int unicode_lookup_index(uint32_t codepoint)
 	{{
-		size_t i = 0;
+		// Slight search optimizations: prevent CPU from fetching data from unlikely areas
+		static constexpr auto cb = std::cbegin(unicode_table1);
+		static constexpr auto ce = std::cend(unicode_table1);
+		static constexpr auto ce3 = std::lower_bound(cb, ce, 0x1100); // before hangul
+		static constexpr auto ce4 = std::lower_bound(cb, ce3, 0x300); // after latin, modifiers
+		auto beg = ce3;
+		auto end = ce;
 
-		for(i = 0; i < sizeof(unicode_table)/sizeof(unicode_table[0]); i++) {{
-			if (unicode_table[i] == codepoint)
-				return i;
+		if (codepoint < 0u + *ce4)
+			std::tie(beg, end) = lookup_range<uint16_t, cb, ce4, 32>(codepoint);
+		else if (codepoint < 0u + *ce3)
+			std::tie(beg, end) = lookup_range<uint16_t, ce4, ce3, 64>(codepoint);
+		else if (codepoint <= 0u + ce[-1])
+			std::tie(beg, end) = lookup_range<uint16_t, ce3, ce, 256>(codepoint);
+		else {{
+			static constexpr auto cb2 = std::cbegin(unicode_table2);
+			static constexpr auto ce2 = std::cend(unicode_table2);
+			auto [beg2, end2] = lookup_range<uint32_t, cb2, ce2, 256>(codepoint);
+			auto res = std::lower_bound(beg2, end2, codepoint);
+			if (res != ce2 && *res == codepoint)
+				return res - cb2 + (ce - cb);
+			return -1;
 		}}
+		auto res = std::lower_bound(beg, end, codepoint);
+		if (res != end && *res == codepoint)
+			return res - cb;
 
 		return -1;
 	}}
