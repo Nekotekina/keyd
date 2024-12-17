@@ -67,9 +67,7 @@ struct descriptor {
 };
 
 struct chord {
-	uint8_t keys[8];
-	size_t sz;
-
+	std::array<uint8_t, 8> keys;
 	struct descriptor d;
 };
 
@@ -93,10 +91,8 @@ struct layer {
 	enum layer_type_e type;
 
 	uint8_t mods;
+	std::vector<chord> chords;
 	struct descriptor keymap[256];
-
-	struct chord chords[64];
-	size_t nr_chords;
 
 	/* Used for composite layers. */
 	size_t nr_constituents;
