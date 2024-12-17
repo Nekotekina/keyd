@@ -53,7 +53,7 @@ endif
 all: compose man
 	mkdir -p bin
 	cp scripts/keyd-application-mapper bin/
-	$(CXX) $(CXXFLAGS) -O3 $(COMPAT_FILES) src/*.c src/*.cpp src/vkbd/$(VKBD).cpp -lpthread -o bin/keyd $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -O3 $(COMPAT_FILES) src/*.cpp src/vkbd/$(VKBD).cpp -lpthread -o bin/keyd $(LDFLAGS)
 debug:
 	CFLAGS="-g -fsanitize=address -Wunused" $(MAKE)
 compose:
