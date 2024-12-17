@@ -6,6 +6,7 @@
 
 #include "keyd.h"
 #include <memory>
+#include <algorithm>
 
 static long process_event(struct keyboard *kbd, uint8_t code, int pressed, long time);
 
@@ -289,7 +290,7 @@ static int chord_event_match(struct chord *chord, struct key_event *events, size
 			int found = 0;
 
 			npressed++;
-			for (j = 0; j < chord->sz; j++)
+			for (j = 0; j < chord->keys.size(); j++)
 				if (chord->keys[j] == events[i].code)
 					found = 1;
 
@@ -302,7 +303,7 @@ static int chord_event_match(struct chord *chord, struct key_event *events, size
 	if (npressed == 0)
 		return 0;
 	else
-		return n == chord->sz ? 2 : 1;
+		return n == (chord->keys.size() - std::count(chord->keys.begin(), chord->keys.end(), 0)) ? 2 : 1;
 }
 
 static void enqueue_chord_event(struct keyboard *kbd, uint8_t code, uint8_t pressed, long time)
@@ -333,13 +334,12 @@ static int check_chord_match(struct keyboard *kbd, const struct chord **chord, i
 	long maxts = -1;
 
 	for (idx = 0; idx < kbd->config.layers.size(); idx++) {
-		size_t i;
 		struct layer *layer = &kbd->config.layers[idx];
 
 		if (!kbd->layer_state[idx].active)
 			continue;
 
-		for (i = 0; i < layer->nr_chords; i++) {
+		for (size_t i = 0; i < layer->chords.size(); i++) {
 			int ret = chord_event_match(&layer->chords[i],
 						    kbd->chord.queue,
 						    kbd->chord.queue_sz);
@@ -859,7 +859,7 @@ static int resolve_chord(struct keyboard *kbd)
 
 		assert(code);
 
-		queue_offset = chord->sz;
+		queue_offset = chord->keys.size() - std::count(chord->keys.begin(), chord->keys.end(), 0);
 		process_event(kbd, code, 1, kbd->chord.last_code_time);
 	}
 
@@ -890,11 +890,10 @@ static int handle_chord(struct keyboard *kbd,
 			uint8_t chord_code = KEYD_CHORD_1 + i;
 
 			if (ac->active) {
-				size_t i;
 				int nremaining = 0;
 				int found = 0;
 
-				for (i = 0; i < ac->chord.sz; i++) {
+				for (size_t i = 0; i < ac->chord.keys.size(); i++) {
 					if (ac->chord.keys[i] == code) {
 						ac->chord.keys[i] = 0;
 						found = 1;
@@ -1005,9 +1004,7 @@ static int handle_chord(struct keyboard *kbd,
 		enqueue_chord_event(kbd, code, pressed, time);
 
 		if (!pressed) {
-			size_t i;
-
-			for (i = 0; i < kbd->chord.match->sz; i++)
+			for (size_t i = 0; i < kbd->chord.match->keys.size(); i++)
 				if (kbd->chord.match->keys[i] == code)
 					return abort_chord(kbd);
 		}

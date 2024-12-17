@@ -211,18 +211,14 @@ static uint8_t lookup_keycode(const char *name)
 	return 0;
 }
 
-static struct descriptor *layer_lookup_chord(struct layer *layer, uint8_t *keys, size_t n)
+static struct descriptor *layer_lookup_chord(struct layer *layer, decltype(chord::keys)& keys, size_t n)
 {
-	size_t i;
-
-	for (i = 0; i < layer->nr_chords; i++) {
-		size_t j;
+	for (size_t i = 0; i < layer->chords.size(); i++) {
 		size_t nm = 0;
 		struct chord *chord = &layer->chords[i];
 
-		for (j = 0; j < n; j++) {
-			size_t k;
-			for (k = 0; k < chord->sz; k++)
+		for (size_t j = 0; j < n; j++) {
+			for (size_t k = 0; k < chord->keys.size(); k++)
 				if (keys[j] == chord->keys[k]) {
 					nm++;
 					break;
@@ -251,7 +247,7 @@ static int set_layer_entry(const struct config *config,
 		//TODO: Handle aliases
 		char *tok;
 		struct descriptor *ld;
-		uint8_t keys[ARRAY_SIZE(layer->chords[0].keys)];
+		decltype(chord::keys) keys{};
 		size_t n = 0;
 
 		for (tok = strtok(key, "+"); tok; tok = strtok(NULL, "+")) {
@@ -273,18 +269,7 @@ static int set_layer_entry(const struct config *config,
 		if ((ld = layer_lookup_chord(layer, keys, n))) {
 			*ld = *d;
 		} else {
-			struct chord *chord;
-			if (layer->nr_chords >= ARRAY_SIZE(layer->chords)) {
-				err("max chords exceeded(%ld)", layer->nr_chords);
-				return -1;
-			}
-
-			chord = &layer->chords[layer->nr_chords];
-			memcpy(chord->keys, keys, sizeof keys);
-			chord->sz = n;
-			chord->d = *d;
-
-			layer->nr_chords++;
+			layer->chords.emplace_back() = {keys, *d};
 		}
 	} else {
 		for (size_t i = 0; i < config->aliases.size(); i++) {
@@ -320,7 +305,7 @@ static int new_layer(std::string_view s, const struct config *config, struct lay
 		type = s.substr(name.size() + 1);
 
 	layer->name = name;
-	layer->nr_chords = 0;
+	layer->chords.clear();
 
 	if (name.find_first_of("+") + 1 /* Found */) {
 		int n = 0;
