@@ -244,12 +244,15 @@ static void lookup_descriptor(struct keyboard *kbd, uint8_t code,
 
 static void deactivate_layer(struct keyboard *kbd, int idx)
 {
-	dbg("Deactivating layer %s", kbd->config.layers[idx].name.c_str());
+	::layer& layer = kbd->config.layers[idx];
+	layer.name_buf.back() = 0;
+	dbg("Deactivating layer %s", layer.name_buf.c_str() + 1);
+	layer.name_buf.back() = '\n';
 
 	assert(kbd->layer_state[idx].active > 0);
 	kbd->layer_state[idx].active--;
 
-	kbd->output.on_layer_change(kbd, &kbd->config.layers[idx], 0);
+	kbd->output.on_layer_change(kbd, &layer, 0);
 }
 
 /*
@@ -259,7 +262,10 @@ static void deactivate_layer(struct keyboard *kbd, int idx)
 
 static void activate_layer(struct keyboard *kbd, uint8_t code, int idx)
 {
-	dbg("Activating layer %s", kbd->config.layers[idx].name.c_str());
+	::layer& layer = kbd->config.layers[idx];
+	layer.name_buf.back() = 0;
+	dbg("Activating layer %s", layer.name_buf.c_str() + 1);
+	layer.name_buf.back() = '\n';
 	struct cache_entry *ce;
 
 	kbd->layer_state[idx].activation_time = get_time();
@@ -268,7 +274,7 @@ static void activate_layer(struct keyboard *kbd, uint8_t code, int idx)
 	if ((ce = cache_get(kbd, code)))
 		ce->layer = idx;
 
-	kbd->output.on_layer_change(kbd, &kbd->config.layers[idx], 1);
+	kbd->output.on_layer_change(kbd, &layer, 1);
 }
 
 /* Returns:
@@ -815,7 +821,7 @@ std::unique_ptr<keyboard> new_keyboard(struct config *config, const struct outpu
 		for (i = 0; i < kbd->config.layers.size(); i++) {
 			struct layer *layer = &kbd->config.layers[i];
 
-			if (layer->type == LT_LAYOUT && layer->name == kbd->config.default_layout) {
+			if (layer->type == LT_LAYOUT && layer->name() == kbd->config.default_layout) {
 				kbd->layer_state[i].active = 1;
 				kbd->layer_state[i].activation_time = 1;
 				found = 1;

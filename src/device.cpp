@@ -349,7 +349,7 @@ int device_grab(struct device *dev)
 		usleep(100);
 	}
 
-	if (ioctl(dev->fd, EVIOCGRAB, (void *) 1) < 0) {
+	if (ioctl(dev->fd, EVIOCGRAB, (volatile void*) 1) < 0) {
 		perror("EVIOCGRAB");
 		return -1;
 	}
