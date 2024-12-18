@@ -10,6 +10,7 @@
 #include "macro.h"
 #include <vector>
 #include <string>
+#include <string_view>
 #include <array>
 
 #define MAX_DESCRIPTOR_ARGS	3
@@ -84,7 +85,7 @@ enum layer_type_e : short {
 };
 
 struct layer {
-	std::string name;
+	mutable std::string name_buf;
 
 	enum layer_type_e type;
 
@@ -95,6 +96,14 @@ struct layer {
 	/* Used for composite layers. */
 	size_t nr_constituents;
 	int constituents[8];
+
+	std::string_view name() const
+	{
+		std::string_view n = name_buf;
+		n.remove_prefix(1);
+		n.remove_suffix(1);
+		return n;
+	}
 };
 
 struct config {

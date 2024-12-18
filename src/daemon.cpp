@@ -23,8 +23,52 @@ static std::unique_ptr<config_ent> configs;
 
 static uint8_t keystate[256];
 
-static int listeners[32];
-static size_t nr_listeners = 0;
+struct listener
+{
+	listener() = default;
+	explicit listener(int fd)
+		: fd(fd)
+	{
+	}
+
+	listener(const listener&) = delete;
+	listener& operator=(const listener&) = delete;
+
+	listener(listener&& r)
+	{
+		if (fd != -1)
+			close(fd);
+		std::swap(fd, r.fd);
+		r.fd = -1;
+	}
+
+	listener& operator=(listener&& r)
+	{
+		std::swap(fd, r.fd);
+		return *this;
+	}
+
+	~listener()
+	{
+		if (fd != -1)
+			close(fd);
+	}
+
+	operator int() const
+	{
+		return fd;
+	}
+
+private:
+	int fd = -1;
+};
+
+static std::vector<listener> listeners = [] {
+	std::vector<listener> v;
+	v.reserve(32);
+	return v;
+}();
+
 static struct keyboard *active_kbd = NULL;
 
 static void cleanup()
@@ -61,31 +105,25 @@ static void add_listener(int con)
 	tv.tv_usec = 50000;
 	tv.tv_sec = 0;
 
-	if (nr_listeners == ARRAY_SIZE(listeners)) {
-		char s[] = "Max listeners exceeded\n";
-		xwrite(con, &s, sizeof s);
-
-		close(con);
-		return;
-	}
-
 	setsockopt(con, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);
 
+	::listener listener(con);
+
 	if (active_kbd) {
-		size_t i;
 		struct config *config = &active_kbd->config;
 
-		for (i = 0; i < config->layers.size(); i++) {
+		for (size_t i = 0; i < config->layers.size(); i++) {
 			if (active_kbd->layer_state[i].active) {
 				struct layer *layer = &config->layers[i];
 
-				write(con, layer->type == LT_LAYOUT ? "/" : "+", 1);
-				write(con, layer->name.c_str(), layer->name.size());
-				write(con, "\n", 1);
+				if (layer->type != LT_LAYOUT)
+					layer->name_buf[0] = '+'; // Should be already +
+				if (size_t r = write(listener, layer->name_buf.c_str(), layer->name_buf.size()); r != layer->name_buf.size())
+					return;
 			}
 		}
 	}
-	listeners[nr_listeners++] = con;
+	listeners.emplace_back(std::move(con));
 }
 
 static void activate_leds(const struct keyboard *kbd)
@@ -105,35 +143,17 @@ static void activate_leds(const struct keyboard *kbd)
 
 static void on_layer_change(const struct keyboard *kbd, const struct layer *layer, uint8_t state)
 {
-	size_t i;
-	std::string buf = "/" + layer->name + "\n";
-
-	int keep[ARRAY_SIZE(listeners)];
-	size_t n = 0;
-
 	if (kbd->config.layer_indicator) {
 		activate_leds(kbd);
 	}
 
-	if (!nr_listeners)
-		return;
-
 	if (layer->type != LT_LAYOUT)
-		buf[0] = state ? '+' : '-';
+		layer->name_buf[0] = state ? '+' : '-';
 
-	for (i = 0; i < nr_listeners; i++) {
-		size_t nw = write(listeners[i], buf.c_str(), buf.size());
-
-		if (nw == buf.size())
-			keep[n++] = listeners[i];
-		else
-			close(listeners[i]);
-	}
-
-	if (n != nr_listeners) {
-		nr_listeners = n;
-		memcpy(listeners, keep, n * sizeof(int));
-	}
+	std::erase_if(listeners, [&](::listener& listener) {
+		size_t nw = write(listener, layer->name_buf.c_str(), layer->name_buf.size());
+		return nw != layer->name_buf.size();
+	});
 }
 
 static void load_configs()
@@ -276,7 +296,7 @@ static void send_fail(int con, const char *fmt, ...)
 	va_end(args);
 }
 
-static int input(char *buf, size_t sz, uint32_t timeout)
+static int input(char *buf, [[maybe_unused]] size_t sz, uint32_t timeout)
 {
 	size_t i;
 	uint32_t codepoint;
@@ -549,7 +569,7 @@ static int event_handler(struct event *ev)
 	return timeout;
 }
 
-int run_daemon(int argc, char *argv[])
+int run_daemon(int, char *[])
 {
 	ipcfd = ipc_create_server(/* SOCKET_PATH */);
 	if (ipcfd < 0)

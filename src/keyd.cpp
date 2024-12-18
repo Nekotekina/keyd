@@ -37,14 +37,14 @@ static int ipc_exec(enum ipc_msg_type_e type, const char *data, size_t sz, uint3
 	return type == IPC_FAIL;
 }
 
-static int version(int argc, char *argv[])
+static int version(int, char *[])
 {
 	printf("keyd " VERSION "\n");
 
 	return 0;
 }
 
-static int help(int argc, char *argv[])
+static int help(int, char *[])
 {
 	printf("usage: keyd [-v] [-h] [command] [<args>]\n\n"
 	       "Commands:\n"
@@ -60,7 +60,7 @@ static int help(int argc, char *argv[])
 	return 0;
 }
 
-static int list_keys(int argc, char *argv[])
+static int list_keys(int, char *[])
 {
 	size_t i;
 
@@ -161,7 +161,7 @@ static int input(int argc, char *argv[])
 	return ipc_exec(IPC_INPUT, buf, sz, timeout);
 }
 
-static int layer_listen(int argc, char *argv[])
+static int layer_listen(int, char *[])
 {
 	struct ipc_message msg = {};
 
@@ -186,7 +186,7 @@ static int layer_listen(int argc, char *argv[])
 	}
 }
 
-static int reload(int argc, char *argv[])
+static int reload(int, char *[])
 {
 	ipc_exec(IPC_RELOAD, NULL, 0, 0);
 

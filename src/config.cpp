@@ -269,7 +269,10 @@ static int new_layer(std::string_view s, const struct config *config, struct lay
 	if (name != s)
 		type = s.substr(name.size() + 1);
 
-	layer->name = name;
+	layer->name_buf.reserve(name.size() + 2);
+	layer->name_buf += "/"; // LAYOUT indicator (default)
+	layer->name_buf += name;
+	layer->name_buf += "\n";
 	layer->chords.clear();
 
 	if (name.find_first_of("+") + 1 /* Found */) {
@@ -880,7 +883,7 @@ int config_get_layer_index(const struct config *config, std::string_view name)
 		return -1;
 
 	for (i = 0; i < config->layers.size(); i++)
-		if (config->layers[i].name == name)
+		if (config->layers[i].name() == name)
 			return i;
 
 	return -1;
