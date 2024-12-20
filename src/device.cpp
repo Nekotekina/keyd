@@ -194,7 +194,7 @@ static int device_init(const char *path, struct device *dev)
 		dev->data = NULL;
 		dev->grabbed = 0;
 
-		dev->is_virtual = !strcmp(dev->name, VKBD_NAME);
+		dev->is_virtual = std::string_view(dev->name).starts_with(VKBD_NAME);
 		return 0;
 	} else {
 		close(fd);

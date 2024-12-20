@@ -171,7 +171,7 @@ static void execute_macro(struct keyboard *kbd, int dl, const macro& macro)
 		send_key(kbd, code, 0);
 	} else {
 		update_mods(kbd, dl, 0);
-		macro_execute(kbd->output.send_key, macro, kbd->config.macro_sequence_timeout);
+		macro_execute(kbd->output.send_key, macro, kbd->config.macro_sequence_timeout, &kbd->config);
 	}
 }
 
@@ -371,7 +371,7 @@ static int check_chord_match(struct keyboard *kbd, const struct chord **chord, i
 		return 0;
 }
 
-static void execute_command(const char *cmd)
+void execute_command(const char *cmd)
 {
 	int fd;
 

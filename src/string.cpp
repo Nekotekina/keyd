@@ -3,61 +3,53 @@
  *
  * © 2019 Raheman Vaiya (see also: LICENSE).
  */
-#include <assert.h>
 
 #include "strutil.h"
 
-int utf8_read_char(const char *_s, uint32_t *code)
-{
-	const unsigned char *s = (const unsigned char*)_s;
 
-	if (!s[0])
+int utf8_read_char(std::string_view _s, uint32_t &code)
+{
+	if (_s.empty())
 		return 0;
+	const auto s = reinterpret_cast<const unsigned char*>(_s.data());
 
 	if (s[0] >= 0xF0) {
-		assert(s[1]);
-		assert(s[2]);
-		assert(s[3]);
-		*code = (s[0] & 0x07) << 18 | (s[1] & 0x3F) << 12 | (s[2] & 0x3F) << 6 | (s[3] & 0x3F);
+		if (_s.size() < 4)
+			return 0;
+		code = (s[0] & 0x07) << 18 | (s[1] & 0x3F) << 12 | (s[2] & 0x3F) << 6 | (s[3] & 0x3F);
 		return 4;
 	} else if (s[0] >= 0xE0) {
-		assert(s[1]);
-		assert(s[2]);
-		*code = (s[0] & 0x0F) << 12 | (s[1] & 0x3F) << 6 | (s[2] & 0x3F);
+		if (_s.size() < 3)
+			return 0;
+		code = (s[0] & 0x0F) << 12 | (s[1] & 0x3F) << 6 | (s[2] & 0x3F);
 		return 3;
 	} else if (s[0] >= 0xC0) {
-		assert(s[1]);
-		*code = (s[0] & 0x1F) << 6 | (s[1] & 0x3F);
+		if (_s.size() < 2)
+			return 0;
+		code = (s[0] & 0x1F) << 6 | (s[1] & 0x3F);
 		return 2;
 	} else {
-		*code = s[0] & 0x7F;
+		code = s[0] & 0x7F;
 		return 1;
 	}
 }
 
-int utf8_strlen(const char *s)
+int utf8_read_char(const char *_s, uint32_t *code)
+{
+	return utf8_read_char(_s, *code);
+}
+
+int utf8_strlen(std::string_view s)
 {
 	uint32_t code;
-	int csz;
 	int n = 0;
 
-	while ((csz = utf8_read_char(s, &code))) {
+	while (int csz = utf8_read_char(s, code)) {
 		n++;
-		s+=csz;
+		s.remove_prefix(csz);
 	}
 
 	return n;
-}
-
-int is_timeval(const char *s)
-{
-	if (s[0] < '0' || s[0] > '9')
-		return 0;
-
-	while(*s && *s >= '0' && *s <= '9')
-		s++;
-
-	return s[0] == 'm' && s[1] == 's' && (s[2] == 0 || s[2] == '\n');
 }
 
 /*

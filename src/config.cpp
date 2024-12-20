@@ -30,6 +30,8 @@
 #include <span>
 #include <iostream>
 #include <fstream>
+#include <ranges>
+#include <span>
 
 #ifndef DATA_DIR
 #define DATA_DIR
@@ -428,23 +430,19 @@ exit:
  *   > 0 for all other errors
  */
 
-int parse_macro_expression(const char *s, macro& macro)
+static int parse_macro_expression(std::string_view s, macro& macro, struct config* config)
 {
 	uint8_t code, mods;
 
-	std::string buf = s;
-	auto ptr = buf.data();
-
-	if (buf.starts_with("macro(") && buf.ends_with(')')) {
-		buf.pop_back();
-		ptr += 6;
-		str_escape(ptr);
-	} else if (parse_key_sequence(ptr, &code, &mods) && utf8_strlen(ptr) != 1) {
-		err("Invalid macro");
+	if (s.starts_with("macro(") && s.ends_with(')')) {
+		s.remove_suffix(1);
+		s.remove_prefix(6);
+	} else if (parse_key_sequence(s, &code, &mods) && utf8_strlen(s) != 1) {
+		err("Invalid macro: %s\n", std::string(s).c_str());
 		return -1;
 	}
 
-	return macro_parse(ptr, macro) == 0 ? 0 : 1;
+	return macro_parse(s, macro, config) == 0 ? 0 : 1;
 }
 
 static int parse_command(const char *s, std::string& command)
@@ -520,7 +518,7 @@ static int parse_descriptor(char *s,
 		config->commands.emplace_back(std::move(cmd));
 
 		return 0;
-	} else if ((ret = parse_macro_expression(s, macro)) >= 0) {
+	} else if ((ret = parse_macro_expression(s, macro, config)) >= 0) {
 		if (ret)
 			return -1;
 
@@ -626,7 +624,7 @@ static int parse_descriptor(char *s,
 						}
 
 						config->macros.emplace_back();
-						if (parse_macro_expression(argstr, config->macros.back())) {
+						if (parse_macro_expression(argstr, config->macros.back(), config)) {
 							config->macros.pop_back();
 							return -1;
 						}

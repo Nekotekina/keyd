@@ -31,8 +31,8 @@ constexpr std::array<keycode_table_ent, 256> keycode_table_arr = []() {
 	r[KEYD_0] = { "0", NULL, ")" },
 	r[KEYD_MINUS] = { "-", "minus", "_" },
 	r[KEYD_EQUAL] = { "=", "equal", "+" },
-	r[KEYD_BACKSPACE] = { "backspace", NULL, NULL },
-	r[KEYD_TAB] = { "tab", NULL, NULL },
+	r[KEYD_BACKSPACE] = { "backspace", "\b", NULL },
+	r[KEYD_TAB] = { "tab", "\t", NULL },
 	r[KEYD_Q] = { "q", NULL, "Q" },
 	r[KEYD_W] = { "w", NULL, "W" },
 	r[KEYD_E] = { "e", NULL, "E" },
@@ -45,7 +45,7 @@ constexpr std::array<keycode_table_ent, 256> keycode_table_arr = []() {
 	r[KEYD_P] = { "p", NULL, "P" },
 	r[KEYD_LEFTBRACE] = { "[", "leftbrace", "{" },
 	r[KEYD_RIGHTBRACE] = { "]", "rightbrace", "}" },
-	r[KEYD_ENTER] = { "enter", NULL, NULL },
+	r[KEYD_ENTER] = { "enter", "\n", NULL },
 	r[KEYD_LEFTCTRL] = { "leftcontrol", "", NULL },
 	r[KEYD_IS_LEVEL3_SHIFT] = { "iso-level3-shift", NULL, NULL }, //Oddly missing from input-event-codes.h, appears to be used as altgr in an english keymap on X
 	r[KEYD_A] = { "a", NULL, "A" },
@@ -75,7 +75,7 @@ constexpr std::array<keycode_table_ent, 256> keycode_table_arr = []() {
 	r[KEYD_RIGHTSHIFT] = { "rightshift", NULL, NULL },
 	r[KEYD_KPASTERISK] = { "kpasterisk", NULL, NULL },
 	r[KEYD_LEFTALT] = { "leftalt", "", NULL },
-	r[KEYD_SPACE] = { "space", NULL, NULL },
+	r[KEYD_SPACE] = { "space", " ", NULL },
 	r[KEYD_CAPSLOCK] = { "capslock", NULL, NULL },
 	r[KEYD_F1] = { "f1", NULL, NULL },
 	r[KEYD_F2] = { "f2", NULL, NULL },
@@ -350,18 +350,16 @@ int parse_modset(const char *s, uint8_t *mods)
 	return 0;
 }
 
-int parse_key_sequence(const char *s, uint8_t *codep, uint8_t *modsp)
+int parse_key_sequence(std::string_view s, uint8_t *codep, uint8_t *modsp)
 {
-	const char *c = s;
-	size_t i;
-
-	if (!*s)
+	auto c = s;
+	if (s.empty())
 		return -1;
 
 	uint8_t mods = 0;
 
-	while (c[1] == '-') {
-		switch (*c) {
+	while (c.size() >= 2 && c[1] == '-') {
+		switch (c[0]) {
 		case 'C':
 			mods |= MOD_CTRL;
 			break;
@@ -382,15 +380,14 @@ int parse_key_sequence(const char *s, uint8_t *codep, uint8_t *modsp)
 			break;
 		}
 
-		c += 2;
+		c.remove_prefix(2);
 	}
 
-	for (i = 0; i < 256; i++) {
+	for (size_t i = 0; i < 256; i++) {
 		const struct keycode_table_ent *ent = &keycode_table[i];
 
 		if (ent->name) {
-			if (ent->shifted_name &&
-			    !strcmp(ent->shifted_name, c)) {
+			if (ent->shifted_name && ent->shifted_name == c) {
 
 				mods |= MOD_SHIFT;
 
@@ -401,8 +398,7 @@ int parse_key_sequence(const char *s, uint8_t *codep, uint8_t *modsp)
 					*codep = i;
 
 				return 0;
-			} else if (!strcmp(ent->name, c) ||
-				   (ent->alt_name && !strcmp(ent->alt_name, c))) {
+			} else if (ent->name == c || (ent->alt_name && ent->alt_name == c)) {
 
 				if (modsp)
 					*modsp = mods;

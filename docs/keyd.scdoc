@@ -31,7 +31,7 @@ keyd(1)
 	between emitted events.
 
 *do [-t <timeout>] [<exp>]*
-	Execute the supplied expression. See MACROS for the format of <exp>. If no arguments are given, the expression is read from STDIN. If supplied, <timeout> corresponds to the macro_sequence_timeout.
+	Execute the supplied expression. See MACROS for the format of <exp>. If no arguments are given, the expression is read from STDIN. If supplied, <timeout> corresponds to the macro_sequence_timeout. This macro expression is _not_ allowed to execute shell commands.
 
 # OPTIONS
 
@@ -598,13 +598,14 @@ A macro expression has one of the following forms:
 	. [<modifier 1>[-<modifier 2>...]-<key>
 	. <char>
 
-Where _<char>_ is a valid unicode character and _<exp>_ has the form _<token1> [<token2>...]_ and each token is one of:
+Where _<char>_ is a valid unicode character and _<exp>_ has the form _<token1> [<token2> ...]_ and each token is one of:
 
 	- A valid key code.
 	- A type 2 macro.
-	- A contiguous group of unicode characters.
+	- A unicode character.
 	- A group of key codes delimited by + to be depressed as a unit.
 	- A timeout of the form _<time>ms_ (where _<time>_ < 1024).
+	- A command to execute of the form _cmd(<shell command>)_, similar to command() action.
 
 The following are all valid macro expressions:
 
@@ -612,12 +613,12 @@ The following are all valid macro expressions:
 	- macro(C-a)
 	- macro(leftcontrol+leftmeta) # simultaneously taps the left meta and left control keys
 	- A-M-x
-	- macro(Hello space World)
 	- macro(h e l l o space w o r ld) (identical to the above)
-	- macro(C-t 100ms google.com enter)
+	- macro(C-t 100ms g o o g l e . c o m enter)
+	- macro(cmd(brightness down))
 
 Splitting into smaller tokens serves as an escaping mechanism: _macro(space)_
-inserts a space but _macro(s pace)_ writes "space". Likewise, _macro(3+5)_
+inserts a space but _macro(s p a c e)_ writes "space". Likewise, _macro(3+5)_
 depresses the 3 and 5 keys as a unit while _macro(3 + 5)_ writes "3+5".
 
 Some prerequisites are needed for non-ASCII characters to work, see _Unicode Support_.
