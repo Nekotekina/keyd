@@ -349,18 +349,16 @@ int parse_modset(const char *s, uint8_t *mods)
 	return 0;
 }
 
-int parse_key_sequence(const char *s, uint8_t *codep, uint8_t *modsp)
+int parse_key_sequence(std::string_view s, uint8_t *codep, uint8_t *modsp)
 {
-	const char *c = s;
-	size_t i;
-
-	if (!*s)
+	auto c = s;
+	if (s.empty())
 		return -1;
 
 	uint8_t mods = 0;
 
-	while (c[1] == '-') {
-		switch (*c) {
+	while (c.size() >= 2 && c[1] == '-') {
+		switch (c[0]) {
 		case 'C':
 			mods |= MOD_CTRL;
 			break;
@@ -381,15 +379,14 @@ int parse_key_sequence(const char *s, uint8_t *codep, uint8_t *modsp)
 			break;
 		}
 
-		c += 2;
+		c.remove_prefix(2);
 	}
 
-	for (i = 0; i < 256; i++) {
+	for (size_t i = 0; i < 256; i++) {
 		const struct keycode_table_ent *ent = &keycode_table[i];
 
 		if (ent->name) {
-			if (ent->shifted_name &&
-			    !strcmp(ent->shifted_name, c)) {
+			if (ent->shifted_name && ent->shifted_name == c) {
 
 				mods |= MOD_SHIFT;
 
@@ -400,8 +397,7 @@ int parse_key_sequence(const char *s, uint8_t *codep, uint8_t *modsp)
 					*codep = i;
 
 				return 0;
-			} else if (!strcmp(ent->name, c) ||
-				   (ent->alt_name && !strcmp(ent->alt_name, c))) {
+			} else if (ent->name == c || (ent->alt_name && ent->alt_name == c)) {
 
 				if (modsp)
 					*modsp = mods;

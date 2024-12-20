@@ -411,12 +411,12 @@ static void handle_client(int con)
 		while (msg.sz && msg.data[msg.sz-1] == '\n')
 			msg.data[--msg.sz] = 0;
 
-		if (macro_parse(msg.data, macro)) {
+		if (macro_parse(msg.data, macro, nullptr)) {
 			send_fail(con, "%s", errstr);
 			return;
 		}
 
-		macro_execute(send_key, macro, msg.timeout);
+		macro_execute(send_key, macro, msg.timeout, nullptr);
 		send_success(con);
 
 		break;

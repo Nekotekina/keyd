@@ -1,48 +1,81 @@
 #include "keyd.h"
+#include "macro.h"
+#include "config.h"
+#include <ranges>
+#include <numeric>
+#include <span>
 
 /*
  * Parses expressions of the form: C-t hello enter.
- * Returns 0 on success. Mangles the input string.
+ * Returns 0 on success.
  */
 
-int macro_parse(char *s, macro& macro)
+int macro_parse(std::string_view s, macro& macro, struct config* config)
 {
-	char *tok;
-
 	#define ADD_ENTRY(t, d) macro.push_back(macro_entry{.type = t, .data = static_cast<uint16_t>(d)})
 
 	macro.clear();
-	for (tok = strtok(s, " "); tok; tok = strtok(NULL, " ")) {
+	while (true) {
+		std::string_view tok = s.substr(0, s.find_first_of(" \t\r\n"));
+		std::string buf;
+		if (tok.starts_with("cmd(")) {
+			s.remove_prefix(4);
+			for (size_t i = 0; i < s.size(); i++) {
+				if (s[i] == '\\')
+					i++;
+				else if (s[i] == ')') {
+					tok = s.substr(0, i);
+					break;
+				}
+			}
+			if (tok.size() == s.size()) {
+				err("incomplete macro command found");
+				return -1;
+			}
+			if (!config) {
+				err("commands are not allowed in this context");
+				return -1;
+			}
+			if (config->commands.size() >= std::numeric_limits<decltype(descriptor_arg::idx)>::max()) {
+				err("max commands exceeded");
+				return -1;
+			}
+			buf.assign(tok);
+			buf.resize(str_escape(buf.data()));
+			ADD_ENTRY(MACRO_COMMAND, config->commands.size());
+			config->commands.emplace_back(std::move(buf));
+			s.remove_prefix(tok.size() + 1);
+			s = s.substr(s.find_first_not_of(" \t\r\n") + 1);
+			continue;
+		}
+
+		s.remove_prefix(tok.size());
+		buf.resize(str_escape(buf.data()));
+		tok = buf;
 		uint8_t code, mods;
-		size_t len = strlen(tok);
 
 		if (!parse_key_sequence(tok, &code, &mods)) {
 			ADD_ENTRY(MACRO_KEYSEQUENCE, (mods << 8) | code);
-		} else if (strchr(tok, '+')) {
-			char *saveptr;
-			char *key;
+		} else if (tok.find_first_of('+') + 1) {
+			for (std::span<const char> range : std::ranges::split_view(tok, '+')) {
+				const std::string_view key(range.data(), range.size());
 
-			for (key = strtok_r(tok, "+", &saveptr); key; key = strtok_r(NULL, "+", &saveptr)) {
-				size_t len = strlen(key);
-
-				if (is_timeval(key))
-					ADD_ENTRY(MACRO_TIMEOUT, atoi(key));
+				if (key.ends_with("ms") && key.find_first_not_of("0123456789") == key.size() - 2)
+					ADD_ENTRY(MACRO_TIMEOUT, atoi(key.data()));
 				else if (!parse_key_sequence(key, &code, &mods))
 					ADD_ENTRY(MACRO_HOLD, code);
 				else {
-					err("%s is not a valid key", key);
+					err("%s is not a valid key", std::string(key).c_str());
 					return -1;
 				}
 			}
 
 			ADD_ENTRY(MACRO_RELEASE, 0);
-		} else if (is_timeval(tok)) {
-			ADD_ENTRY(MACRO_TIMEOUT, atoi(tok));
+		} else if (tok.ends_with("ms") && tok.find_first_not_of("0123456789") == tok.size() - 2) {
+			ADD_ENTRY(MACRO_TIMEOUT, atoi(tok.data()));
 		} else {
 			uint32_t codepoint;
-			int chrsz;
-
-			while ((chrsz=utf8_read_char(tok, &codepoint))) {
+			while (int chrsz = utf8_read_char(tok, codepoint)) {
 				int i;
 				int xcode;
 
@@ -64,9 +97,15 @@ int macro_parse(char *s, macro& macro)
 				} else if ((xcode = unicode_lookup_index(codepoint)) > 0)
 					ADD_ENTRY(MACRO_UNICODE, xcode);
 
-				tok += chrsz;
+				if (tok.size() <= size_t(chrsz))
+					break;
+				tok.remove_prefix(chrsz);
 			}
 		}
+
+		if (s.empty())
+			break;
+		s = s.substr(s.find_first_not_of(" \t\r\n"));
 	}
 
 	return 0;
@@ -75,7 +114,7 @@ int macro_parse(char *s, macro& macro)
 }
 
 void macro_execute(void (*output)(uint8_t, uint8_t),
-		   const macro& macro, size_t timeout)
+		   const macro& macro, size_t timeout, struct config* config)
 {
 	size_t i;
 	int hold_start = -1;
@@ -149,6 +188,11 @@ void macro_execute(void (*output)(uint8_t, uint8_t),
 			break;
 		case MACRO_TIMEOUT:
 			usleep(ent->data * 1E3);
+			break;
+		case MACRO_COMMAND:
+			extern void execute_command(const char *cmd);
+			if (config)
+				execute_command(config->commands.at(ent->data).c_str());
 			break;
 		}
 

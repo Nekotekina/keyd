@@ -234,13 +234,13 @@ static void write_key_event(const struct vkbd *vkbd, uint8_t code, int state)
 	pthread_mutex_unlock(&mtx);
 }
 
-std::shared_ptr<vkbd> vkbd_init(const char *name)
+std::shared_ptr<vkbd> vkbd_init(const char *)
 {
 	pthread_t tid;
 
 	auto vkbd = std::make_shared<struct vkbd>();
-	vkbd->fd = create_virtual_keyboard(name);
-	vkbd->pfd = create_virtual_pointer("keyd virtual pointer");
+	vkbd->fd = create_virtual_keyboard(VKBD_NAME "keyboard");
+	vkbd->pfd = create_virtual_pointer(VKBD_NAME "pointer");
 
 	return vkbd;
 }

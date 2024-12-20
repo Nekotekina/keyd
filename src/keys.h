@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string_view>
 
 #define MOD_ALT_GR	0x10
 #define MOD_CTRL	0x8
@@ -291,7 +292,7 @@ struct modifier {
 #define KEY_NAME(code) (keycode_table[code].name ? keycode_table[code].name : "UNKNOWN")
 
 int parse_modset(const char *s, uint8_t *mods);
-int parse_key_sequence(const char *s, uint8_t *code, uint8_t *mods);
+int parse_key_sequence(std::string_view, uint8_t *code, uint8_t *mods);
 
 extern const struct modifier modifiers[MAX_MOD];
 extern const struct keycode_table_ent* keycode_table;

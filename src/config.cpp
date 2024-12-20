@@ -28,6 +28,8 @@
 #include <string_view>
 #include <iostream>
 #include <fstream>
+#include <ranges>
+#include <span>
 
 #ifndef DATA_DIR
 #define DATA_DIR
@@ -286,8 +288,8 @@ static int new_layer(std::string_view s, const struct config *config, struct lay
 			return -1;
 		}
 
-		while (true) {
-			std::string_view layername = name.substr(0, s.find_first_of("+"));
+		for (std::span<const char> range : std::ranges::split_view(name, '+')) {
+			const std::string_view layername(range.data(), range.size());
 			int idx = config_get_layer_index(config, layername);
 
 			if (idx < 0) {
@@ -301,20 +303,16 @@ static int new_layer(std::string_view s, const struct config *config, struct lay
 			}
 
 			layer->constituents[layer->nr_constituents++] = idx;
-
-			if (name == layername)
-				break;
-			name.remove_prefix(layername.size() + 1);
 		}
 
 	} else if (!type.empty() && type == "layout") {
-			layer->type = LT_LAYOUT;
+		layer->type = LT_LAYOUT;
 	} else if (!type.empty() && !parse_modset(type.data() /* Must be NTS */, &mods)) {
-			layer->type = LT_NORMAL;
-			layer->mods = mods;
+		layer->type = LT_NORMAL;
+		layer->mods = mods;
 	} else {
 		if (!type.empty())
-			warn("\"%s\" is not a valid layer type, ignoring\n", type);
+			warn("\"%s\" is not a valid layer type, ignoring\n", std::string(type).c_str());
 
 		layer->type = LT_NORMAL;
 		layer->mods = 0;
@@ -430,23 +428,19 @@ exit:
  *   > 0 for all other errors
  */
 
-int parse_macro_expression(const char *s, macro& macro)
+static int parse_macro_expression(std::string_view s, macro& macro, struct config* config)
 {
 	uint8_t code, mods;
 
-	std::string buf = s;
-	auto ptr = buf.data();
-
-	if (buf.starts_with("macro(") && buf.ends_with(')')) {
-		buf.pop_back();
-		ptr += 6;
-		str_escape(ptr);
-	} else if (parse_key_sequence(ptr, &code, &mods) && utf8_strlen(ptr) != 1) {
-		err("Invalid macro");
+	if (s.starts_with("macro(") && s.ends_with(')')) {
+		s.remove_suffix(1);
+		s.remove_prefix(6);
+	} else if (parse_key_sequence(s, &code, &mods) && utf8_strlen(s) != 1) {
+		err("Invalid macro: %s\n", std::string(s).c_str());
 		return -1;
 	}
 
-	return macro_parse(ptr, macro) == 0 ? 0 : 1;
+	return macro_parse(s, macro, config) == 0 ? 0 : 1;
 }
 
 static int parse_command(const char *s, std::string& command)
@@ -522,7 +516,7 @@ static int parse_descriptor(char *s,
 		config->commands.emplace_back(std::move(cmd));
 
 		return 0;
-	} else if ((ret = parse_macro_expression(s, macro)) >= 0) {
+	} else if ((ret = parse_macro_expression(s, macro, config)) >= 0) {
 		if (ret)
 			return -1;
 
@@ -628,7 +622,7 @@ static int parse_descriptor(char *s,
 						}
 
 						config->macros.emplace_back();
-						if (parse_macro_expression(argstr, config->macros.back())) {
+						if (parse_macro_expression(argstr, config->macros.back(), config)) {
 							config->macros.pop_back();
 							return -1;
 						}
