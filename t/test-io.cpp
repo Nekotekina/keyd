@@ -273,3 +273,37 @@ int main(int argc, char *argv[])
 	printf("\nTotal time spent in the main loop: %zu us\n", total_time/1000);
 	return 0;
 }
+
+static_assert([] {
+	int i = 0;
+	for (auto s : split_char<'+'>("a"))
+		i++;
+	if (i != 1)
+		return false;
+	for (auto s : split_char<'+'>(""))
+		i++;
+	if (i != 2)
+		return false;
+	for (auto s : split_char<'+'>("+a"))
+		i++;
+	if (i != 4)
+		return false;
+	for (auto s : split_char<'+'>("a+"))
+		i++;
+	if (i != 6)
+		return false;
+	for (auto s : split_char<'+'>("a+b"))
+		i++;
+	if (i != 8)
+		return false;
+	return true;
+}());
+
+static_assert(split_char<'+'>("a").count() == 1);
+static_assert(split_char<'+'>("").count() == 1);
+static_assert(split_char<'+'>("+a").count() == 2);
+static_assert(split_char<'+'>("a+").count() == 2);
+static_assert(split_char<'+'>("ab+b").count() == 2);
+static_assert(split_str<'+'>() - split_char<'+'>("a") == 1);
+static_assert(split_char<'+'>("b") - split_char<'+'>("a+b") == 1);
+static_assert(split_char<'+'>("a") - split_str<'+'>() == -1);

@@ -1214,8 +1214,14 @@ int kbd_eval(struct keyboard *kbd, const char *exp)
 {
 	if (!strcmp(exp, "reset")) {
 		kbd->config = *kbd->original_config;
+		kbd->layer_state.resize(kbd->config.layers.size());
 		return 0;
 	} else {
-		return config_add_entry(&kbd->config, exp);
+		if (!config_add_entry(&kbd->config, exp)) {
+			kbd->layer_state.resize(kbd->config.layers.size());
+			return 0;
+		}
 	}
+
+	return -1;
 }

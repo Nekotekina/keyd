@@ -26,12 +26,10 @@
 #include <limits>
 #include <string>
 #include <string_view>
-#include <ranges>
-#include <span>
 #include <iostream>
 #include <fstream>
-#include <ranges>
-#include <span>
+#include <algorithm>
+#include <numeric>
 
 #ifndef DATA_DIR
 #define DATA_DIR
@@ -264,7 +262,35 @@ static int set_layer_entry(const struct config *config,
 	return 0;
 }
 
-static int new_layer(std::string_view s, const struct config *config, struct layer *layer)
+static std::string layer_sorted_name(std::string_view name)
+{
+#ifdef __cpp_lib_constexpr_vector
+	constinit
+#endif
+	static std::vector<std::string_view> arr;
+	arr.assign(split_char<'+'>(name), split_str<'+'>());
+	for (auto& name : arr) {
+		if (name.empty())
+			return {};
+		if (name == "ctrl")
+			name = "control";
+	}
+	std::sort(arr.begin(), arr.end());
+	arr.erase(std::unique(arr.begin(), arr.end()), arr.end());
+
+	std::string res(std::accumulate(arr.begin(), arr.end(), 0, [](auto v, auto str) { return v + str.size() + 1; }) - 1, '\0');
+	char* ptr = std::copy(arr[0].begin(), arr[0].end(), res.data());
+	for (size_t i = 1; i < arr.size(); i++) {
+		*ptr++ = '+';
+		ptr = std::copy(arr[i].begin(), arr[i].end(), ptr);
+	}
+	arr.clear();
+	return res;
+}
+
+static int config_access_layer(struct config *config, std::string_view name, bool single);
+
+static int new_layer(std::string_view s, struct config *config, size_t layer_)
 {
 	uint8_t mods;
 	std::string_view name, type;
@@ -273,6 +299,7 @@ static int new_layer(std::string_view s, const struct config *config, struct lay
 	if (name != s)
 		type = s.substr(name.size() + 1);
 
+	struct ::layer* layer = &config->layers[layer_];
 	layer->name_buf.reserve(name.size() + 2);
 	layer->name_buf += "/"; // LAYOUT indicator (default)
 	layer->name_buf += name;
@@ -290,15 +317,14 @@ static int new_layer(std::string_view s, const struct config *config, struct lay
 			return -1;
 		}
 
-		for (std::span<const char> range : std::ranges::split_view(name, '+')) {
-			const std::string_view layername(range.data(), range.size());
-			int idx = config_get_layer_index(config, layername);
-
+		for (auto layername : split_char<'+'>(name)) {
+			int idx = config_access_layer(config, layername, true);
 			if (idx < 0) {
 				err("%s is not a valid layer", std::string(layername).c_str());
 				return -1;
 			}
 
+			layer = &config->layers[layer_];
 			if (n >= ARRAY_SIZE(layer->constituents)) {
 				err("max composite layers (%d) exceeded", ARRAY_SIZE(layer->constituents));
 				return -1;
@@ -326,25 +352,36 @@ static int new_layer(std::string_view s, const struct config *config, struct lay
 
 /*
  * Returns:
- * 	1 if the layer exists
- * 	0 if the layer was created successfully
+ * 	Layer index if exists or created
  * 	< 0 on error
  */
-static int config_add_layer(struct config *config, std::string_view name)
+static int config_access_layer(struct config *config, std::string_view name, bool single)
 {
-	int ret;
-
-	if (config_get_layer_index(config, name.substr(0, name.find_first_of(":"))) != -1)
-		return 1;
-
-	::layer new_layer = {};
-	ret = ::new_layer(name, config, &new_layer);
-
-	if (ret < 0)
+	std::string sorted_name;
+	if (single)
+		sorted_name.assign(name);
+	else
+		sorted_name = layer_sorted_name(name.substr(0, name.find_first_of(":")));
+	if (sorted_name.empty())
 		return -1;
 
-	config->layers.emplace_back(std::move(new_layer));
-	return 0;
+	const auto found = config->layer_names.find(sorted_name);
+	if (found != config->layer_names.end())
+		return found->second;
+
+	size_t idx = config->layers.size();
+	if (idx > std::numeric_limits<decltype(descriptor_arg::idx)>::max()) {
+		err("max layers exceeded");
+		return -1;
+	}
+	config->layers.emplace_back();
+	if (int ret = new_layer(name, config, idx); ret < 0) {
+		config->layers.pop_back();
+		return ret;
+	}
+
+	config->layer_names[std::move(sorted_name)] = idx;
+	return idx;
 }
 
 /* Modifies the input string */
@@ -508,7 +545,7 @@ static int parse_descriptor(char *s,
 			return -1;
 		}
 
-		if (config->commands.size() >= std::numeric_limits<decltype(d->args[0].idx)>::max()) {
+		if (config->commands.size() > std::numeric_limits<decltype(d->args[0].idx)>::max()) {
 			err("max commands exceeded");
 			return -1;
 		}
@@ -522,7 +559,7 @@ static int parse_descriptor(char *s,
 		if (ret)
 			return -1;
 
-		if (config->macros.size() >= std::numeric_limits<decltype(d->args[0].idx)>::max()) {
+		if (config->macros.size() > std::numeric_limits<decltype(d->args[0].idx)>::max()) {
 			err("max macros exceeded");
 			return -1;
 		}
@@ -603,7 +640,7 @@ static int parse_descriptor(char *s,
 						if (parse_descriptor(argstr, &desc, config))
 							return -1;
 
-						if (config->descriptors.size() >= std::numeric_limits<decltype(arg->idx)>::max()) {
+						if (config->descriptors.size() > std::numeric_limits<decltype(arg->idx)>::max()) {
 							err("maximum descriptors exceeded");
 							return -1;
 						}
@@ -618,7 +655,7 @@ static int parse_descriptor(char *s,
 						arg->timeout = atoi(argstr);
 						break;
 					case ARG_MACRO:
-						if (config->macros.size() >= std::numeric_limits<decltype(arg->idx)>::max()) {
+						if (config->macros.size() > std::numeric_limits<decltype(arg->idx)>::max()) {
 							err("max macros exceeded");
 							return -1;
 						}
@@ -763,7 +800,7 @@ static int config_parse_string(struct config *config, char *content)
 			parse_global_section(config, section);
 			section->lnum = -1;
 		} else {
-			if (config_add_layer(config, section->name) < 0)
+			if (config_access_layer(config, section->name, false) < 0)
 				warn("%s", errstr);
 		}
 	}
@@ -873,14 +910,9 @@ int config_check_match(struct config *config, const char *id, uint8_t flags)
 
 int config_get_layer_index(const struct config *config, std::string_view name)
 {
-	size_t i;
-
-	if (name.empty())
-		return -1;
-
-	for (i = 0; i < config->layers.size(); i++)
-		if (config->layers[i].name() == name)
-			return i;
+	const auto found = config->layer_names.find(layer_sorted_name(name));
+	if (found != config->layer_names.end())
+		return found->second;
 
 	return -1;
 }
@@ -895,7 +927,6 @@ int config_add_entry(struct config *config, const char *exp)
 	const char *layername = "main";
 	struct descriptor d;
 	struct layer *layer;
-	int idx;
 
 	std::string buf = exp;
 	s = buf.data();
@@ -910,8 +941,7 @@ int config_add_entry(struct config *config, const char *exp)
 	}
 
 	parse_kvp(s, &keyname, &descstr);
-	idx = config_get_layer_index(config, layername);
-
+	int idx = config_access_layer(config, layername, false);
 	if (idx == -1) {
 		err("%s is not a valid layer", layername);
 		return -1;

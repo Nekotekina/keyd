@@ -12,6 +12,7 @@
 #include <string>
 #include <string_view>
 #include <array>
+#include <map>
 
 #define MAX_DESCRIPTOR_ARGS	3
 
@@ -109,6 +110,7 @@ struct layer {
 struct config {
 	std::string pathstr;
 	std::vector<layer> layers;
+	std::map<std::string, size_t, std::less<>> layer_names;
 
 	/* Auxiliary descriptors used by layer bindings. */
 	std::vector<descriptor> descriptors;

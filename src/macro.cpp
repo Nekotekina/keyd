@@ -1,7 +1,6 @@
 #include "keyd.h"
 #include "macro.h"
 #include "config.h"
-#include <ranges>
 #include <numeric>
 #include <span>
 
@@ -38,7 +37,7 @@ int macro_parse(std::string_view s, macro& macro, struct config* config)
 				err("commands are not allowed in this context");
 				return -1;
 			}
-			if (is_cmd && config->commands.size() >= std::numeric_limits<decltype(descriptor_arg::idx)>::max()) {
+			if (is_cmd && config->commands.size() > std::numeric_limits<decltype(descriptor_arg::idx)>::max()) {
 				err("max commands exceeded");
 				return -1;
 			}
@@ -102,9 +101,7 @@ int macro_parse(std::string_view s, macro& macro, struct config* config)
 			ADD_ENTRY(MACRO_KEYSEQUENCE, (mods << 8) | code);
 			continue;
 		} else if (tok.find_first_of('+') + 1) {
-			for (std::span<const char> range : std::ranges::split_view(tok, '+')) {
-				const std::string_view key(range.data(), range.size());
-
+			for (auto key : split_char<'+'>(tok)) {
 				if (key.ends_with("ms") && key.find_first_not_of("0123456789") == key.size() - 2)
 					ADD_ENTRY(MACRO_TIMEOUT, atoi(key.data()));
 				else if (!parse_key_sequence(key, &code, &mods))
