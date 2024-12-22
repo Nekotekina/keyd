@@ -23,7 +23,7 @@ static uint8_t lookup_code(const char *name)
 {
 	size_t i;
 
-	if (!strcmp(name, "control"))
+	if (!strcmp(name, "control") || !strcmp(name, "ctrl"))
 		return KEYD_LEFTCTRL;
 	if (!strcmp(name, "shift"))
 		return KEYD_LEFTSHIFT;

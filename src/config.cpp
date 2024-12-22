@@ -208,8 +208,6 @@ static int set_layer_entry(const struct config *config,
 			   struct layer *layer, char *key,
 			   const struct descriptor *d)
 {
-	int found = 0;
-
 	if (strchr(key, '+')) {
 		//TODO: Handle aliases
 		char *tok;
@@ -239,14 +237,11 @@ static int set_layer_entry(const struct config *config,
 			layer->chords.emplace_back() = {keys, *d};
 		}
 	} else {
-		for (size_t i = 0; i < config->aliases.size(); i++) {
-			if (config->aliases[i] == key) {
-				layer->keymap[i] = *d;
-				found = 1;
-			}
-		}
-
-		if (!found) {
+		auto range = config->aliases.equal_range(std::string_view(key));
+		if (range.first != range.second) {
+			while (range.first != range.second)
+				layer->keymap[range.first++->second.args[0].code] = *d;
+		} else {
 			uint8_t code;
 
 			if (!(code = lookup_keycode(key))) {
@@ -358,7 +353,9 @@ static int new_layer(std::string_view s, struct config *config, size_t layer_)
 static int config_access_layer(struct config *config, std::string_view name, bool single)
 {
 	std::string sorted_name;
-	if (single)
+	if (single && name == "ctrl")
+		sorted_name.assign("control");
+	else if (single)
 		sorted_name.assign(name);
 	else
 		sorted_name = layer_sorted_name(name.substr(0, name.find_first_of(":")));
@@ -770,7 +767,10 @@ static void parse_alias_section(struct config *config, struct ini_section *secti
 					d->args[1].mods = 0;
 				}
 
-				config->aliases[code] = name;
+				config->aliases.emplace(name, descriptor{
+					.op = OP_KEYSEQUENCE,
+					.args = {{ .code = code }},
+				});
 			}
 		} else {
 			warn("failed to define alias %s, %s is not a valid keycode", name, ent->key);
@@ -853,6 +853,8 @@ static void config_init(struct config *config)
 
 	"leftcontrol = control\n"
 	"rightcontrol = control\n"
+	"leftctrl = ctrl\n"
+	"rightctrl = ctrl\n"
 
 	"[main]\n"
 
@@ -860,9 +862,9 @@ static void config_init(struct config *config)
 	"alt = layer(alt)\n"
 	"altgr = layer(altgr)\n"
 	"meta = layer(meta)\n"
-	"control = layer(control)\n"
+	"ctrl = layer(control)\n"
 
-	"[control:C]\n"
+	"[ctrl:C]\n"
 	"[shift:S]\n"
 	"[meta:M]\n"
 	"[alt:A]\n"

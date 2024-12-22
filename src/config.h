@@ -116,7 +116,7 @@ struct config {
 	std::vector<descriptor> descriptors;
 	std::vector<macro> macros;
 	std::vector<std::string> commands;
-	std::array<std::string, 256> aliases;
+	std::multimap<std::string, descriptor, std::less<>> aliases;
 
 	uint8_t wildcard;
 	struct {
