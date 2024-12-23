@@ -1,6 +1,7 @@
 #include "keyd.h"
 #include <memory>
 #include <utility>
+#include <fstream>
 
 #ifndef CONFIG_DIR
 #define CONFIG_DIR ""
@@ -304,7 +305,6 @@ static void send_success(int con)
 	msg.sz = 0;
 
 	xwrite(con, &msg, sizeof msg);
-	close(con);
 }
 
 static void send_fail(int con, const char *fmt, ...)
@@ -318,7 +318,6 @@ static void send_fail(int con, const char *fmt, ...)
 	msg.sz = vsnprintf(msg.data, sizeof(msg.data), fmt, args);
 
 	xwrite(con, &msg, sizeof msg);
-	close(con);
 
 	va_end(args);
 }
@@ -389,21 +388,23 @@ static int input(char *buf, [[maybe_unused]] size_t sz, uint32_t timeout)
 	return 0;
 }
 
-static void handle_client(int con)
+static bool handle_message(int con, struct config* config)
 {
 	struct ipc_message msg;
-
-	xread(con, &msg, sizeof msg);
+	if (!xread(con, &msg, sizeof(msg))) {
+		// Disconnected
+		return false;
+	}
 
 	if (msg.sz >= sizeof(msg.data)) {
 		send_fail(con, "maximum message size exceeded");
-		return;
+		return false;
 	}
 	msg.data[msg.sz] = 0;
 
 	if (msg.timeout > 1000000) {
 		send_fail(con, "timeout cannot exceed 1000 ms");
-		return;
+		return false;
 	}
 
 	::macro macro;
@@ -414,12 +415,12 @@ static void handle_client(int con)
 		while (msg.sz && msg.data[msg.sz-1] == '\n')
 			msg.data[--msg.sz] = 0;
 
-		if (macro_parse(msg.data, macro, nullptr)) {
+		if (macro_parse(msg.data, macro, config)) {
 			send_fail(con, "%s", errstr);
-			return;
+			break;
 		}
 
-		macro_execute(send_key, macro, msg.timeout, nullptr);
+		macro_execute(send_key, macro, msg.timeout, config);
 		send_success(con);
 
 		break;
@@ -441,12 +442,15 @@ static void handle_client(int con)
 
 		if (msg.sz == sizeof(msg.data)) {
 			send_fail(con, "bind expression size exceeded");
-			return;
+			break;
 		}
 
 		msg.data[msg.sz] = 0;
 
 		for (auto ent = configs.get(); ent; ent = ent->next.get()) {
+			ent->kbd->config.cfg_use_uid = config->cfg_use_uid;
+			ent->kbd->config.cfg_use_gid = config->cfg_use_gid;
+			ent->kbd->config.env = config->env;
 			if (!kbd_eval(ent->kbd.get(), msg.data))
 				success = 1;
 		}
@@ -462,6 +466,53 @@ static void handle_client(int con)
 		send_fail(con, "Unknown command");
 		break;
 	}
+
+	return true;
+}
+
+static void handle_client(int con)
+{
+	static socklen_t ucred_len = sizeof(struct ucred);
+	struct ucred cred{};
+	if (getsockopt(con, SOL_SOCKET, SO_PEERCRED, &cred, &ucred_len) < 0)
+		return;
+
+	::config ephemeral_config;
+	ephemeral_config.cfg_use_gid = cred.gid;
+	ephemeral_config.cfg_use_uid = cred.uid;
+	if (getuid() < 1000)
+	{
+		// Copy initial environment variables from caller process
+		std::ifstream envf(("/proc/" + std::to_string(cred.pid) + "/environ").c_str(), std::ios::binary);
+		if (envf.is_open()) {
+			std::vector<char> buf;
+			buf.assign(std::istreambuf_iterator<char>(envf), std::istreambuf_iterator<char>());
+			static std::shared_ptr<env_pack> prev = nullptr;
+			if (prev && prev->buf == buf && prev->uid == cred.uid && prev->gid == cred.gid) {
+				// Share previous environment variables
+				ephemeral_config.env = prev;
+			} else {
+				size_t count = std::count(buf.begin(), buf.end(), 0);
+				auto env = std::make_unique<const char*[]>(count + 1);
+				auto ptr = env.get();
+				for (auto str : split_char<0>({buf.data(), buf.size() - 1}))
+					*ptr++ = str.data();
+				*ptr = nullptr;
+				prev = ephemeral_config.env = std::make_shared<env_pack>(::env_pack{
+					.buf = std::move(buf),
+					.env = std::move(env),
+					.uid = cred.uid,
+					.gid = cred.gid,
+				});
+			}
+		}
+	}
+
+	size_t msg_count = 0;
+	while (handle_message(con, &ephemeral_config)) {
+		msg_count++;
+	}
+	dbg2("%zu messages processed", msg_count);
 }
 
 static int event_handler(struct event *ev)
@@ -592,7 +643,7 @@ static int event_handler(struct event *ev)
 		break;
 	case EV_FD_ACTIVITY:
 		if (ev->fd == ipcfd) {
-			int con = accept(ipcfd, NULL, 0);
+			::listener con(accept(ipcfd, NULL, 0));
 			if (con < 0) {
 				perror("accept");
 				exit(-1);

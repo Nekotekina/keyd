@@ -550,7 +550,12 @@ static int parse_descriptor(char *s,
 
 		d->op = OP_COMMAND;
 		d->args[0].idx = config->commands.size();
-		config->commands.emplace_back(std::move(cmd));
+		config->commands.emplace_back(::ucmd{
+			.uid = config->cfg_use_uid,
+			.gid = config->cfg_use_gid,
+			.cmd = std::move(cmd),
+			.env = config->env,
+		});
 
 		return 0;
 	} else if ((ret = parse_macro_expression(s, macro, config)) >= 0) {

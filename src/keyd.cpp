@@ -17,7 +17,7 @@ static int ipc_exec(enum ipc_msg_type_e type, const char *data, size_t sz, uint3
 	msg.timeout = timeout;
 	memcpy(msg.data, data, sz);
 
-	int con = ipc_connect();
+	static int con = ipc_connect();
 
 	if (con < 0) {
 		perror("connect");
@@ -25,7 +25,8 @@ static int ipc_exec(enum ipc_msg_type_e type, const char *data, size_t sz, uint3
 	}
 
 	xwrite(con, &msg, sizeof msg);
-	xread(con, &msg, sizeof msg);
+	if (!xread(con, &msg, sizeof msg))
+		exit(-1);
 
 	if (msg.sz) {
 		xwrite(1, msg.data, msg.sz);
@@ -33,8 +34,6 @@ static int ipc_exec(enum ipc_msg_type_e type, const char *data, size_t sz, uint3
 	}
 
 	return msg.type == IPC_FAIL;
-
-	return type == IPC_FAIL;
 }
 
 static int version(int, char *[])

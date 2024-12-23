@@ -15,17 +15,23 @@ void xwrite(int fd, const void *buf, size_t sz)
 	}
 }
 
-void xread(int fd, void *buf, size_t sz)
+bool xread(int fd, void *buf, size_t sz)
 {
 	size_t nrd = 0;
 	ssize_t n;
 
 	while(sz != nrd) {
 		n = read(fd, (char*)buf + nrd, sz-nrd);
+		if (n == 0) {
+			// EOF
+			return false;
+		}
 		if (n < 0) {
 			perror("read");
-			exit(-1);
+			return false;
 		}
 		nrd += n;
 	}
+
+	return true;
 }

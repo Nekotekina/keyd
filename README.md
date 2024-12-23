@@ -14,7 +14,7 @@ using kernel level input primitives (evdev, uinput).
 
 The config format has undergone several iterations since the first
 release. For those migrating their configs from v1 it is best
-to reread the man page. 
+to reread the man page.
 
 See also: [changelog](docs/CHANGELOG.md).
 
@@ -143,7 +143,7 @@ E.G
 
 	`keyd-application-mapper`
 
-You will probably want to put `keyd-application-mapper -d` somewhere in your 
+You will probably want to put `keyd-application-mapper -d` somewhere in your
 display server initialization logic (e.g ~/.xinitrc) unless you are running Gnome.
 
 See the man page for more details.
@@ -206,7 +206,7 @@ If you wish to help maintain this PPA, please contact
 	[ids]
 
 	*
-	
+
 	[main]
 
 	leftshift = oneshot(shift)
@@ -245,41 +245,11 @@ control (when held) and remaps all modifiers to 'oneshot' keys. Thus to produce
 the letter A you can now simply tap shift and then a instead of having to hold
 it. Finally it remaps insert to S-insert (paste on X11).
 
-# FAQS
+# Example keyd-application-mapper configuration
 
-## What about xmodmap/setxkbmap/*?
+	[org-gnome-nautilus]
+	meta.f = macro(C-c 50ms cmd(xsel -ocb | xargs firefox))
 
-xmodmap and friends are display server level tools with limited functionality.
-keyd is a system level solution which implements advanced features like
-layering and [oneshot](https://docs.qmk.fm/#/one_shot_keys)
-modifiers.  While some X tools offer similar functionality I am not aware of
-anything that is as flexible as keyd.
-
-## What about [kmonad](https://github.com/kmonad/kmonad)?
-
-keyd was written several years ago to allow me to easily experiment with
-different layouts on my growing keyboard collection. At the time kmonad did not
-exist and custom keyboard firmware like
-[QMK](https://github.com/qmk/qmk_firmware) (which inspired keyd) was the only
-way to get comparable features. I became aware of kmonad after having published
-keyd. While kmonad is a fine project with similar goals, it takes a different
-approach and has a different design philosophy.
-
-Notably keyd was written entirely in C with performance and simplicitly in
-mind and will likely never be as configurable as kmonad (which is extensible
-in Haskell). Having said that, it supplies (in the author's opinion) the
-most valuable features in less than 2000 lines of C while providing
-a simple language agnostic config format.
-
-## Why doesn't keyd implement feature X?
-
-If you feel something is missing or find a bug you are welcome to file an issue
-on github. keyd has a minimalist (but sane) design philosophy which
-intentionally omits certain features (e.g execing arbitrary executables
-as root). Things which already exist in custom keyboard firmware like QMK are
-good candidates for inclusion.
-
-# Contributing
-
-See [CONTRIBUTING](CONTRIBUTING.md).
-IRC Channel: #keyd on oftc
+This command will open (hopefully) selected file in Firefox.
+Be aware that this command copies the file into the clipboard.
+This assumes GNOME with Nautilus file browser and X or Xwayland.

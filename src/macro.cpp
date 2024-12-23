@@ -46,7 +46,12 @@ int macro_parse(std::string_view s, macro& macro, struct config* config)
 			s.remove_prefix(tok.size() + 1);
 			if (is_cmd) {
 				ADD_ENTRY(MACRO_COMMAND, config->commands.size());
-				config->commands.emplace_back(std::move(buf));
+				config->commands.emplace_back(::ucmd{
+					.uid = config->cfg_use_uid,
+					.gid = config->cfg_use_gid,
+					.cmd = std::move(buf),
+					.env = config->env,
+				});
 			} else {
 				uint32_t codepoint;
 				while (int chrsz = utf8_read_char(tok, codepoint)) {
@@ -234,9 +239,9 @@ void macro_execute(void (*output)(uint8_t, uint8_t),
 			usleep(ent->data * 1E3);
 			break;
 		case MACRO_COMMAND:
-			extern void execute_command(const char *cmd);
+			extern void execute_command(ucmd& cmd);
 			if (config)
-				execute_command(config->commands.at(ent->data).c_str());
+				execute_command(config->commands.at(ent->data));
 			break;
 		}
 

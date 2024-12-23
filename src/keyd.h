@@ -98,7 +98,7 @@ void evloop_add_fd(int fd);
 int evloop(int (*event_handler) (struct event *ev));
 
 void xwrite(int fd, const void *buf, size_t sz);
-void xread(int fd, void *buf, size_t sz);
+bool xread(int fd, void *buf, size_t sz);
 
 int ipc_create_server();
 int ipc_connect();

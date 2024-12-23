@@ -371,21 +371,24 @@ static int check_chord_match(struct keyboard *kbd, const struct chord **chord, i
 		return 0;
 }
 
-void execute_command(const char *cmd)
+void execute_command(ucmd& cmd)
 {
-	int fd;
-
-	dbg("executing command: %s", cmd);
+	dbg("executing command: %s", cmd.cmd.c_str());
 
 	if (fork()) {
-		wait(NULL);
 		return;
 	}
-	if (fork())
-		exit(0);
 
-	fd = open("/dev/null", O_RDWR);
+	if (setgid(cmd.gid) < 0) {
+		perror("setgid");
+		exit(-1);
+	}
+	if (setuid(cmd.uid) < 0) {
+		perror("setuid");
+		exit(-1);
+	}
 
+	int fd = open("/dev/null", O_RDWR);
 	if (fd < 0) {
 		perror("open");
 		exit(-1);
@@ -399,7 +402,10 @@ void execute_command(const char *cmd)
 	dup2(fd, 1);
 	dup2(fd, 2);
 
-	execl("/bin/sh", "/bin/sh", "-c", cmd, NULL);
+	if (auto env = cmd.env.get())
+		execle("/bin/sh", "/bin/sh", "-c", cmd.cmd.c_str(), nullptr, env->env.get());
+	else
+		execl("/bin/sh", "/bin/sh", "-c", cmd.cmd.c_str(), nullptr);
 }
 
 static void clear_oneshot(struct keyboard *kbd)
@@ -731,7 +737,7 @@ static long process_descriptor(struct keyboard *kbd, uint8_t code,
 		break;
 	case OP_COMMAND:
 		if (pressed) {
-			execute_command(kbd->config.commands[d->args[0].idx].c_str());
+			execute_command(kbd->config.commands[d->args[0].idx]);
 			clear_oneshot(kbd);
 			update_mods(kbd, -1, 0);
 		}
@@ -811,6 +817,8 @@ std::unique_ptr<keyboard> new_keyboard(std::unique_ptr<keyboard> kbd)
 	kbd->layer_state.resize(kbd->config.layers.size());
 	kbd->layer_state[0].active = 1;
 	kbd->layer_state[0].activation_time = 0;
+	kbd->config.cfg_use_uid = getuid();
+	kbd->config.cfg_use_gid = getuid(); // match uid
 
 	if (kbd->config.default_layout[0]) {
 		int found = 0;
