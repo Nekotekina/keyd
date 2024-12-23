@@ -16,7 +16,7 @@ keyd(1)
 *listen*
 	Print layer state changes of the running keyd daemon to stdout. Useful for scripting.
 
-*bind reset|<binding> [<binding>...]*
+*bind reset|push|pop|pop_all<binding> [<binding>...]*
 	Apply the supplied bindings. See _Bindings_ for details.
 
 *reload*
@@ -797,8 +797,9 @@ The _bind_ command accepts one or more _bindings_, each of which must have the f
 Where _<layer>_ is the name of an (existing) layer in which the key is to be bound.
 
 As a special case, the string "reset" may be used in place of a binding, in
-which case the current keymap will revert to its original state (all
+which case the current keymap will revert to its last pushed state (all
 dynamically applied bindings will be dropped).
+Commands "push" and "pop|pop_all" maintain additional layers of states.
 
 Examples:
 
@@ -970,10 +971,5 @@ Disables the esc and end keys.
 
 # AUTHOR
 
-Written by Raheman Vaiya (2017-).
-
-# BUGS
-
-Please file any bugs or feature requests at the following url:
-
-<https://github.com/rvaiya/keyd/issues>
+Written by Raheman Vaiya (2017-) in C.
+Port to C++ in progress by Nekotekina.

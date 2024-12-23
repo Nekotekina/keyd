@@ -905,7 +905,7 @@ static int config_parse_string(struct config *config, char *content)
 			entry += ent->key;
 			entry += " = ";
 			entry += ent->val;
-			if (config_add_entry(config, entry.c_str()) < 0)
+			if (config_add_entry(config, entry) < 0)
 				keyd_log("\tr{ERROR:} line m{%zd}: %s\n", ent->lnum, errstr);
 		}
 	}
@@ -1011,14 +1011,18 @@ int config_get_layer_index(const struct config *config, std::string_view name)
  * Adds a binding of the form [<layer>.]<key> = <descriptor expression>
  * to the given config. Returns layer index that was modified.
  */
-int config_add_entry(struct config *config, const char *exp)
+int config_add_entry(struct config* config, std::string_view exp)
 {
 	char *keyname, *descstr, *dot, *paren, *s;
 	const char *layername = "main";
 	struct descriptor d;
 	struct layer *layer;
 
-	std::string buf = exp;
+#ifdef __cpp_lib_constexpr_string
+	constinit
+#endif
+	static std::string buf;
+	buf.assign(exp);
 	s = buf.data();
 
 	dot = strchr(s, '.');

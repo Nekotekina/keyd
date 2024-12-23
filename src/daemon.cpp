@@ -212,7 +212,7 @@ static void load_configs()
 					.on_layer_change = on_layer_change,
 				};
 				kbd = new_keyboard(std::move(kbd));
-				kbd->original_config.reserve(1);
+				kbd->original_config.reserve(2);
 				kbd->original_config.emplace_back(kbd->config);
 
 				ent->kbd = std::move(kbd);
@@ -449,8 +449,7 @@ static bool handle_message(int con, struct config* config)
 			ent->kbd->config.cfg_use_uid = config->cfg_use_uid;
 			ent->kbd->config.cfg_use_gid = config->cfg_use_gid;
 			ent->kbd->config.env = config->env;
-			if (!kbd_eval(ent->kbd.get(), msg.data))
-				success = 1;
+			success |= kbd_eval(ent->kbd.get(), msg.data);
 		}
 
 		if (success)

@@ -148,7 +148,7 @@ struct keyboard {
 std::unique_ptr<keyboard> new_keyboard(std::unique_ptr<keyboard>);
 
 long kbd_process_events(struct keyboard *kbd, const struct key_event *events, size_t n);
-int kbd_eval(struct keyboard *kbd, const char *exp);
+bool kbd_eval(struct keyboard *kbd, std::string_view);
 void kbd_reset(struct keyboard *kbd);
 
 #endif

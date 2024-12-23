@@ -1,8 +1,4 @@
-[![Kofi](https://badgen.net/badge/icon/kofi?icon=kofi&label)](https://ko-fi.com/rvaiya)
-
-# Impetus
-
-[![Packaging status](https://repology.org/badge/tiny-repos/keyd.svg)](https://repology.org/project/keyd/versions)
+# keyd++
 
 Linux lacks a good key remapping solution. In order to achieve satisfactory
 results a medley of tools need to be employed (e.g xcape, xmodmap) with the end
@@ -10,20 +6,12 @@ result often being tethered to a specified environment (X11). keyd attempts to
 solve this problem by providing a flexible system wide daemon which remaps keys
 using kernel level input primitives (evdev, uinput).
 
-# Note on v2
-
-The config format has undergone several iterations since the first
-release. For those migrating their configs from v1 it is best
-to reread the man page.
-
-See also: [changelog](docs/CHANGELOG.md).
-
 # Goals
 
-  - Speed       (a hand tuned input loop written in C that takes <<1ms)
+  - Speed       (event loop that takes <<1ms for input event)
   - Simplicity  (a [config format](#sample-config) that is intuitive)
-  - Consistency (modifiers that [play nicely with layers](https://github.com/rvaiya/keyd/blob/6dc2d5c4ea76802fd192b143bdd53b1787fd6deb/docs/keyd.scdoc#L128) by default)
-  - Modularity  (a UNIXy core extensible through the use of an [IPC](https://github.com/rvaiya/keyd/blob/90973686723522c2e44d8e90bb3508a6da625a20/docs/keyd.scdoc#L391) mechanism)
+  - Consistency (modifiers that [play nicely with layers](docs/keyd.scdoc#L128) by default)
+  - Modularity  (a UNIXy core extensible through the use of an [IPC](docs/keyd.scdoc#L391) mechanism)
 
 # Features
 
@@ -33,7 +21,7 @@ as well as some which are unique to keyd.
 
 Some of the more interesting ones include:
 
-- Layers (with support for [hybrid modifiers](https://github.com/rvaiya/keyd/blob/6dc2d5c4ea76802fd192b143bdd53b1787fd6deb/docs/keyd.scdoc#L128)).
+- Layers (with support for [hybrid modifiers](docs/keyd.scdoc#L128)).
 - Key overloading (different behaviour on tap/hold).
 - Keyboard specific configuration.
 - Instantaneous remapping (no more flashing :)).
@@ -41,6 +29,22 @@ Some of the more interesting ones include:
 - System wide config (works in a VT).
 - First class support for modifier overloading.
 - Unicode support.
+
+keyd++ has specific features at the moment:
+
+- Virtually unlimited sizes/counts (keyd has had many hardcoded limitations).
+- Layer indicator with keyboard led of choice (keyd is somewhat broken).
+- **Macro** can now do `type(Hello world)` without worrying about spaces.
+- **Macro** can now execute `cmd(gnome-terminal)` and it should **just work**.
+- Allow using `ctrl` as an alias for `control` (my personal whim).
+- Wildcard for mice `m:` that excludes problematic abs ptr devices(`a:`).
+- More flexible text parsing (in progress, eg. 'a+b' now equals 'b+a').
+- Memory optimizations (sometimes only 1/5 of what keyd has had).
+- Performance optimizations, eg. events from ungrabbed device are ignored.
+- Some security improvement: privileged commands shall be in /etc/keyd/ conf.
+- Commands coming from ex. `keyd-application-mapper` inherit uid+gid+environ.
+- New commands for config reset control: push, pop, pop_all.
+- Convenience and safety coming from C++20. Sorry for longer compilation.
 
 ### keyd is for people who:
 
@@ -59,7 +63,7 @@ Some of the more interesting ones include:
 
 # Dependencies
 
- - Your favourite C compiler
+ - C++20 compiler starting from clang++-14 or g++-11
  - Linux kernel headers (already present on most systems)
 
 ## Optional
@@ -70,15 +74,22 @@ Some of the more interesting ones include:
 
 # Installation
 
-*Note:* master serves as the development branch, things may occasionally break
-between releases. Releases are [tagged](https://github.com/rvaiya/keyd/tags), and should be considered stable.
+*Note:* master serves as the development branch, things may occasionally break.
 
 ## From Source
 
-    git clone https://github.com/rvaiya/keyd
-    cd keyd
-    make && sudo make install
-    sudo systemctl enable --now keyd
+```bash
+# Install dependencies (if necessary)
+sudo apt install build-essentials git
+# Clone with git clone (.) or download sources manually to keyd directory
+cd keyd
+# Specify your favourite compiler (optional)
+export CXX=clang++-18
+# First time install
+make && sudo make install && sudo systemctl enable --now keyd
+# Second time install (update, contains **example** flags for statically linking libstdc++)
+CXX=clang++-18 CXXFLAGS='-static-libgcc -static-libstdc++' make && sudo make install && sudo systemctl daemon-reload && sudo systemctl restart keyd
+```
 
 # Quickstart
 
@@ -161,46 +172,6 @@ Third party packages for the some distributions also exist. If you wish to add
 yours to the list please file a PR. These are kindly maintained by community
 members, no personal responsibility is taken for them.
 
-### Alpine Linux
-
-[keyd](https://pkgs.alpinelinux.org/packages?name=keyd) package maintained by [@jirutka](https://github.com/jirutka).
-
-### Arch
-
-[Arch Linux](https://archlinux.org/packages/extra/x86_64/keyd/) package maintained by Arch packagers.
-
-### Debian
-
-Experimental `keyd` and `keyd-application-mapper` packages can be found in the
-CI build artifacts of the [work-in-progress Debian package
-repository](https://salsa.debian.org/rhansen/keyd):
-
-  * [amd64 (64-bit)](https://salsa.debian.org/rhansen/keyd/-/jobs/artifacts/debian/latest/browse/debian/output?job=build)
-  * [i386 (32-bit)](https://salsa.debian.org/rhansen/keyd/-/jobs/artifacts/debian/latest/browse/debian/output?job=build%20i386)
-
-Any Debian Developer who is willing to review the debianization effort and
-sponsor its upload is encouraged to contact
-[@rhansen](https://github.com/rhansen) (also see the [Debian ITP
-bug](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1060023)).
-
-### Fedora
-
-[COPR](https://copr.fedorainfracloud.org/coprs/alternateved/keyd/) package maintained by [@alternateved](https://github.com/alternateved).
-
-### openSUSE
-[opensuse](https://software.opensuse.org//download.html?project=hardware&package=keyd) package maintained by [@bubbleguuum](https://github.com/bubbleguuum).
-
-Easy install with `sudo zypper in keyd`.
-
-### Ubuntu
-
-Experimental `keyd` and `keyd-application-mapper` packages can be found in the
-[`ppa:keyd-team/ppa`
-archive](https://launchpad.net/~keyd-team/+archive/ubuntu/ppa).
-
-If you wish to help maintain this PPA, please contact
-[@rhansen](https://github.com/rhansen).
-
 # Sample Config
 
 	[ids]
@@ -218,7 +189,7 @@ If you wish to help maintain this PPA, please contact
 	f = /
 	...
 
-# Recommended config
+# Example config
 
 Many users will probably not be interested in taking full advantage of keyd.
 For those who seek simple quality of life improvements I can recommend the
