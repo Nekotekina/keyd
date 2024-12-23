@@ -20,7 +20,7 @@
 #define ID_MOUSE	2
 #define ID_KEYBOARD	4
 
-enum op : short {
+enum class op : signed char {
 	OP_NULL = 0,
 	OP_KEYSEQUENCE = 1,
 
@@ -49,6 +49,8 @@ enum op : short {
 	OP_SCROLL_TOGGLE,
 	OP_SCROLL,
 };
+
+using enum op;
 
 union descriptor_arg {
 	uint8_t code;
@@ -79,20 +81,22 @@ struct chord {
  * layers consisting of the corresponding modifier and an empty keymap.
  */
 
-enum layer_type_e : short {
+enum class layer_type_e : signed char {
 	LT_NORMAL,
 	LT_LAYOUT,
 	LT_COMPOSITE,
 };
 
+using enum layer_type_e;
+
 struct layer {
 	mutable std::string name_buf;
 
 	enum layer_type_e type;
-
+	bool modified = false; // Modified by kbd_eval
 	uint8_t mods;
 	std::vector<chord> chords;
-	struct descriptor keymap[256];
+	std::array<descriptor, 256> keymap;
 
 	/* Used for composite layers. */
 	size_t nr_constituents;
@@ -139,6 +143,28 @@ struct config {
 	uint8_t layer_indicator = 255;
 	uint8_t disable_modifier_guard;
 	std::string default_layout;
+
+	config() = default;
+	config(const config&) = delete;
+	config& operator=(const config&) = delete;
+};
+
+struct config_backup {
+	struct layer_backup {
+		decltype(layer::keymap) keymap;
+		decltype(layer::chords) chords;
+	};
+
+	// These are append-only
+	size_t descriptor_count;
+	size_t macro_count;
+	size_t cmd_count;
+	// These ones are nasty
+	std::vector<layer_backup> layers;
+
+	explicit config_backup(const struct config& cfg);
+
+	void restore(struct config& cfg);
 };
 
 int config_parse(struct config *config, const char *path);

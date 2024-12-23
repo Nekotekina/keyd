@@ -246,9 +246,8 @@ int main(int argc, char *argv[])
 	struct config config;
 	uint64_t total_time = 0;
 
-	std::unique_ptr<::keyboard> kbd;
-
-	struct output output = {
+	auto kbd = std::make_unique<::keyboard>();
+	kbd->output = {
 		.send_key = send_key,
 		.on_layer_change = on_layer_change,
 	};
@@ -260,12 +259,12 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	if (config_parse(&config, argv[1])) {
+	if (config_parse(&kbd->config, argv[1])) {
 		printf("Failed to parse config %s\n", argv[1]);
 		return -1;
 	}
 
-	kbd = new_keyboard(&config, &output);
+	kbd = new_keyboard(std::move(kbd));
 
 	for (i = 2; i < argc; i++)
 		total_time += run_test(kbd.get(), argv[i]);

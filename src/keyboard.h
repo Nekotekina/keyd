@@ -36,19 +36,23 @@ struct output {
 	void (*on_layer_change) (const struct keyboard *kbd, const struct layer *layer, uint8_t active);
 };
 
-enum chord_state_e {
+enum class chord_state_e : signed char {
 	CHORD_RESOLVING,
 	CHORD_INACTIVE,
 	CHORD_PENDING_DISAMBIGUATION,
 	CHORD_PENDING_HOLD_TIMEOUT,
 };
 
-enum pending_behaviour_e {
+using enum chord_state_e;
+
+enum class pending_behaviour_e : signed char {
 	PK_INTERRUPT_ACTION1,
 	PK_INTERRUPT_ACTION2,
 	PK_UNINTERRUPTIBLE,
 	PK_UNINTERRUPTIBLE_TAP_ACTION2,
 };
+
+using enum pending_behaviour_e;
 
 struct active_chord {
 	uint8_t active;
@@ -58,7 +62,7 @@ struct active_chord {
 
 /* May correspond to more than one physical input device. */
 struct keyboard {
-	const struct config *original_config;
+	std::vector<config_backup> original_config;
 	struct config config;
 	struct output output;
 
@@ -141,7 +145,7 @@ struct keyboard {
 	} scroll;
 };
 
-std::unique_ptr<keyboard> new_keyboard(struct config *config, const struct output *output);
+std::unique_ptr<keyboard> new_keyboard(std::unique_ptr<keyboard>);
 
 long kbd_process_events(struct keyboard *kbd, const struct key_event *events, size_t n);
 int kbd_eval(struct keyboard *kbd, const char *exp);

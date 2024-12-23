@@ -6,7 +6,7 @@
 #include <vector>
 #include <string_view>
 
-enum macro_e : uint16_t {
+enum class macro_e : signed char {
 	MACRO_KEYSEQUENCE,
 	MACRO_HOLD,
 	MACRO_RELEASE,
@@ -14,6 +14,8 @@ enum macro_e : uint16_t {
 	MACRO_TIMEOUT,
 	MACRO_COMMAND,
 };
+
+using enum macro_e;
 
 struct macro_entry {
 	enum macro_e type;

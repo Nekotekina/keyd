@@ -7,7 +7,6 @@
 #endif
 
 struct config_ent {
-	struct config config = {};
 	std::unique_ptr<keyboard> kbd;
 	std::unique_ptr<config_ent> next;
 
@@ -205,13 +204,17 @@ static void load_configs()
 
 			keyd_log("CONFIG: parsing b{%s}\n", path);
 
-			if (!config_parse(&ent->config, path)) {
-				struct output output = {
+			auto kbd = std::make_unique<keyboard>();
+			if (!config_parse(&kbd->config, path)) {
+				kbd->output = {
 					.send_key = send_key,
 					.on_layer_change = on_layer_change,
 				};
-				ent->kbd = new_keyboard(&ent->config, &output);
+				kbd = new_keyboard(std::move(kbd));
+				kbd->original_config.reserve(1);
+				kbd->original_config.emplace_back(kbd->config);
 
+				ent->kbd = std::move(kbd);
 				ent->next = std::move(configs);
 				configs = std::move(ent);
 			} else {
@@ -231,7 +234,7 @@ static struct config_ent *lookup_config_ent(const char *id, uint8_t flags)
 	int rank = 0;
 
 	while (ent) {
-		int r = config_check_match(&ent->config, id, flags);
+		int r = config_check_match(&ent->kbd->config, id, flags);
 
 		if (r > rank) {
 			match = ent;
@@ -269,7 +272,7 @@ static void manage_device(struct device *dev)
 		}
 
 		keyd_log("DEVICE: g{match}    %s  %s\t(%s)\n",
-			  dev->id, ent->config.pathstr.c_str(), dev->name);
+			  dev->id, ent->kbd->config.pathstr.c_str(), dev->name);
 
 		dev->data = ent->kbd.get();
 		if (dev->capabilities & CAP_LEDS)

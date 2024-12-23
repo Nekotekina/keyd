@@ -200,7 +200,7 @@ static void lookup_descriptor(struct keyboard *kbd, uint8_t code,
 		if (kbd->layer_state[i].active) {
 			long activation_time = kbd->layer_state[i].activation_time;
 
-			if (layer->keymap[code].op && activation_time >= maxts) {
+			if (layer->keymap[code].op != OP_NULL && activation_time >= maxts) {
 				maxts = activation_time;
 				*d = layer->keymap[code];
 				*dl = i;
@@ -225,7 +225,7 @@ static void lookup_descriptor(struct keyboard *kbd, uint8_t code,
 					match = 0;
 			}
 
-			if (match && layer->keymap[code].op && (layer->nr_constituents > max)) {
+			if (match && layer->keymap[code].op != OP_NULL && (layer->nr_constituents > max)) {
 				*d = layer->keymap[code];
 				*dl = i;
 
@@ -234,7 +234,7 @@ static void lookup_descriptor(struct keyboard *kbd, uint8_t code,
 		}
 	}
 
-	if (!d->op) {
+	if (d->op == OP_NULL) {
 		d->op = OP_KEYSEQUENCE;
 		d->args[0].code = code;
 		d->args[1].mods = 0;
@@ -762,7 +762,7 @@ static long process_descriptor(struct keyboard *kbd, uint8_t code,
 				for (i = 0; i < CACHE_SIZE; i++) {
 					uint8_t code = kbd->cache[i].code;
 					int layer = kbd->cache[i].layer;
-					int type = kbd->config.layers[layer].type;
+					auto type = kbd->config.layers[layer].type;
 
 					if (code && layer == dl && type == LT_NORMAL && layer != 0) {
 						ce = &kbd->cache[i];
@@ -804,15 +804,11 @@ static long process_descriptor(struct keyboard *kbd, uint8_t code,
 	return timeout;
 }
 
-std::unique_ptr<keyboard> new_keyboard(struct config *config, const struct output *output)
+std::unique_ptr<keyboard> new_keyboard(std::unique_ptr<keyboard> kbd)
 {
 	size_t i;
-	auto kbd = std::make_unique<keyboard>();
 
-	kbd->original_config = config;
-	kbd->config = *kbd->original_config;
-	kbd->output = *output;
-	kbd->layer_state.resize(config->layers.size());
+	kbd->layer_state.resize(kbd->config.layers.size());
 	kbd->layer_state[0].active = 1;
 	kbd->layer_state[0].activation_time = 0;
 
@@ -1078,7 +1074,7 @@ int handle_pending_key(struct keyboard *kbd, uint8_t code, int pressed, long tim
 			}
 	}
 
-	if (action.op) {
+	if (action.op != OP_NULL) {
 		/* Create a copy of the queue on the stack to
 		   allow for recursive pending key processing. */
 		struct key_event queue[ARRAY_SIZE(kbd->pending_key.queue)];
@@ -1213,12 +1209,13 @@ long kbd_process_events(struct keyboard *kbd, const struct key_event *events, si
 int kbd_eval(struct keyboard *kbd, const char *exp)
 {
 	if (!strcmp(exp, "reset")) {
-		kbd->config = *kbd->original_config;
+		kbd->original_config.back().restore(kbd->config);
 		kbd->layer_state.resize(kbd->config.layers.size());
 		return 0;
 	} else {
-		if (!config_add_entry(&kbd->config, exp)) {
+		if (int idx = config_add_entry(&kbd->config, exp); idx >= 0) {
 			kbd->layer_state.resize(kbd->config.layers.size());
+			kbd->config.layers[idx].modified = true;
 			return 0;
 		}
 	}

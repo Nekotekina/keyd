@@ -38,7 +38,7 @@
 #undef warn
 #define warn(fmt, ...) keyd_log("\ty{WARNING:} " fmt "\n", ##__VA_ARGS__)
 
-enum action_arg_e : short {
+enum class action_arg_e : signed char {
 	ARG_EMPTY,
 
 	ARG_MACRO,
@@ -48,6 +48,8 @@ enum action_arg_e : short {
 	ARG_SENSITIVITY,
 	ARG_DESCRIPTOR,
 };
+
+using enum action_arg_e;
 
 static struct {
 	const char *name;
@@ -285,14 +287,13 @@ static std::string layer_sorted_name(std::string_view name)
 
 static int config_access_layer(struct config *config, std::string_view name, bool single);
 
-static int new_layer(std::string_view s, struct config *config, size_t layer_)
+static int new_layer(std::string_view s, std::string_view name, struct config *config, size_t layer_)
 {
 	uint8_t mods;
-	std::string_view name, type;
+	std::string_view type;
 
-	name = s.substr(0, s.find_first_of(":"));
-	if (name != s)
-		type = s.substr(name.size() + 1);
+	if (auto pos = s.find_first_of(':'); pos + 1)
+		type = s.substr(pos + 1);
 
 	struct ::layer* layer = &config->layers[layer_];
 	layer->name_buf.reserve(name.size() + 2);
@@ -372,7 +373,7 @@ static int config_access_layer(struct config *config, std::string_view name, boo
 		return -1;
 	}
 	config->layers.emplace_back();
-	if (int ret = new_layer(name, config, idx); ret < 0) {
+	if (int ret = new_layer(name, sorted_name, config, idx); ret < 0) {
 		config->layers.pop_back();
 		return ret;
 	}
@@ -594,7 +595,7 @@ static int parse_descriptor(char *s,
 				d->op = actions[i].op;
 
 				for (j = 0; j < MAX_DESCRIPTOR_ARGS; j++) {
-					if (!actions[i].args[j])
+					if (actions[i].args[j] == ARG_EMPTY)
 						break;
 				}
 
@@ -604,7 +605,7 @@ static int parse_descriptor(char *s,
 				}
 
 				while (j--) {
-					int type = actions[i].args[j];
+					auto type = actions[i].args[j];
 					union descriptor_arg *arg = &d->args[j];
 					char *argstr = args[j];
 					struct descriptor desc;
@@ -838,7 +839,6 @@ static void config_init(struct config *config)
 {
 	size_t i;
 
-	*config = {};
 	char default_config[] =
 	"[aliases]\n"
 
@@ -921,7 +921,7 @@ int config_get_layer_index(const struct config *config, std::string_view name)
 
 /*
  * Adds a binding of the form [<layer>.]<key> = <descriptor expression>
- * to the given config.
+ * to the given config. Returns layer index that was modified.
  */
 int config_add_entry(struct config *config, const char *exp)
 {
@@ -954,5 +954,42 @@ int config_add_entry(struct config *config, const char *exp)
 	if (parse_descriptor(descstr, &d, config) < 0)
 		return -1;
 
-	return set_layer_entry(config, layer, keyname, &d);
+	if (set_layer_entry(config, layer, keyname, &d) < 0)
+		return -1;
+
+	return idx;
+}
+
+config_backup::config_backup(const struct config& cfg)
+	: descriptor_count(cfg.descriptors.size())
+	, macro_count(cfg.macros.size())
+	, cmd_count(cfg.macros.size())
+	, layers(cfg.layers.size())
+{
+	for (size_t i = 0; i < layers.size(); i++) {
+		layers[i] = {
+			.keymap = cfg.layers[i].keymap,
+			.chords = cfg.layers[i].chords,
+		};
+	}
+}
+
+void config_backup::restore(struct config& cfg)
+{
+	size_t i = 0;
+	for (; i < layers.size(); i++) {
+		auto& layer = cfg.layers[i];
+		if (layer.modified) {
+			layer.chords = layers[i].chords;
+			layer.keymap = layers[i].keymap;
+			layer.modified = false;
+		}
+	}
+	for (; i < cfg.layers.size(); i++) {
+		cfg.layer_names.erase(cfg.layer_names.find(cfg.layers[i].name()));
+	}
+	cfg.layers.resize(layers.size());
+	cfg.descriptors.resize(descriptor_count);
+	cfg.macros.resize(macro_count);
+	cfg.commands.resize(cmd_count);
 }

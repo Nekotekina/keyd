@@ -51,7 +51,7 @@
 #define ARRAY_SIZE(x) (int)(sizeof(x)/sizeof(x[0]))
 #define VKBD_NAME "keyd virtual "
 
-enum event_type {
+enum class event_type : signed char {
 	EV_DEV_ADD,
 	EV_DEV_REMOVE,
 	EV_DEV_EVENT,
@@ -59,6 +59,8 @@ enum event_type {
 	EV_FD_ERR,
 	EV_TIMEOUT,
 };
+
+using enum event_type;
 
 struct event {
 	enum event_type type;
@@ -68,7 +70,7 @@ struct event {
 	int fd;
 };
 
-enum ipc_msg_type_e {
+enum class ipc_msg_type_e : signed char {
 	IPC_SUCCESS,
 	IPC_FAIL,
 
@@ -78,6 +80,8 @@ enum ipc_msg_type_e {
 	IPC_RELOAD,
 	IPC_LAYER_LISTEN,
 };
+
+using enum ipc_msg_type_e;
 
 struct ipc_message {
 	enum ipc_msg_type_e type;

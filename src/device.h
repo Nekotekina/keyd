@@ -42,7 +42,7 @@ struct device {
 	void *data;
 };
 
-enum dev_event_e {
+enum class dev_event_e : signed char {
 	DEV_KEY,
 	DEV_LED,
 
@@ -53,6 +53,8 @@ enum dev_event_e {
 
 	DEV_REMOVED,
 };
+
+using enum dev_event_e;
 
 struct device_event {
 	enum dev_event_e type;
