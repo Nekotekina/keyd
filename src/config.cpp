@@ -91,6 +91,72 @@ static struct {
 	{ "swap2", 	"swapm",	OP_SWAPM,			{ ARG_LAYER, ARG_MACRO } },
 };
 
+void descriptor_map::sort()
+{
+	if (size + 1)
+		return;
+
+	std::sort(mapv.begin(), mapv.end(), [](auto& a, auto& b) { return a.id < b.id; });
+	size = mapv.size();
+}
+
+void descriptor_map::set(uint8_t id, const descriptor& copy, uint8_t hint)
+{
+	auto& found = const_cast<descriptor&>((*this)[id]);
+	if (found.id == id) {
+		found = copy;
+		found.id = id;
+		return;
+	}
+	if (size < maps.size()) {
+		maps[size] = copy;
+		maps[size].id = id;
+		size++;
+		return;
+	} else if (size == maps.size()) {
+		mapv.reserve(hint);
+		mapv.assign(maps.begin(), maps.end());
+		size = -1;
+	}
+	if (mapv.back().id < id && size + 1) {
+		size++;
+	} else {
+		// Mark unsorted
+		size = -1;
+	}
+	mapv.reserve(hint);
+	auto& res = mapv.emplace_back();
+	res = copy;
+	res.id = id;
+	return;
+}
+
+const descriptor& descriptor_map::operator[](uint8_t id) const
+{
+	if (size <= maps.size()) {
+		// Static array: always unsorted
+		for (auto& d : maps) {
+			if (d.id == id)
+				return d;
+		}
+	} else if (size + 1) {
+		// Sorted binary search
+		const descriptor example = {id, OP_NULL, {}};
+		const auto found = std::lower_bound(mapv.begin(), mapv.end(), example, [](const auto& a, const auto& b) { return a.id < b.id; });
+		if (found != mapv.end() && found->id == id)
+			return *found;
+	} else {
+		// Unsorted search fallback
+		for (auto& d : mapv) {
+			if (d.id == id)
+				return d;
+		}
+	}
+
+	static descriptor null{};
+	return null;
+}
+
 int config_get_layer_index(const struct config *config, std::string_view name);
 
 static std::string resolve_include_path(const char *path, std::string_view include_path)
@@ -242,7 +308,7 @@ static int set_layer_entry(const struct config *config,
 		auto range = config->aliases.equal_range(std::string_view(key));
 		if (range.first != range.second) {
 			while (range.first != range.second)
-				layer->keymap[range.first++->second.args[0].code] = *d;
+				layer->keymap.set(range.first++->second.args[0].code, *d);
 		} else {
 			uint8_t code;
 
@@ -251,8 +317,7 @@ static int set_layer_entry(const struct config *config,
 				return -1;
 			}
 
-			layer->keymap[code] = *d;
-
+			layer->keymap.set(code, *d);
 		}
 	}
 
@@ -766,14 +831,16 @@ static void parse_alias_section(struct config *config, struct ini_section *secti
 				uint8_t alias_code;
 
 				if ((alias_code = lookup_keycode(name))) {
-					struct descriptor *d = &config->layers[0].keymap[code];
+					struct descriptor d = config->layers[0].keymap[code];
 
-					d->op = OP_KEYSEQUENCE;
-					d->args[0].code = alias_code;
-					d->args[1].mods = 0;
+					d.op = OP_KEYSEQUENCE;
+					d.args[0].code = alias_code;
+					d.args[1].mods = 0;
+					config->layers[0].keymap.set(code, d);
 				}
 
 				config->aliases.emplace(name, descriptor{
+					.id = alias_code,
 					.op = OP_KEYSEQUENCE,
 					.args = {{ .code = code }},
 				});

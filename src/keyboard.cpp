@@ -1224,6 +1224,7 @@ int kbd_eval(struct keyboard *kbd, const char *exp)
 		if (int idx = config_add_entry(&kbd->config, exp); idx >= 0) {
 			kbd->layer_state.resize(kbd->config.layers.size());
 			kbd->config.layers[idx].modified = true;
+			kbd->config.layers[idx].keymap.sort();
 			return 0;
 		}
 	}

@@ -16,7 +16,7 @@ const struct modifier modifiers[MAX_MOD] = {
 	{MOD_CTRL, KEYD_LEFTCTRL},
 };
 
-constexpr std::array<keycode_table_ent, 256> keycode_table_arr = []() {
+extern constexpr std::array<keycode_table_ent, 256> keycode_table = []() {
 	std::array<keycode_table_ent, 256> r{};
 	r[KEYD_ESC] = { "esc", "escape", NULL },
 	r[KEYD_1] = { "1", NULL, "!" },
@@ -272,9 +272,6 @@ constexpr std::array<keycode_table_ent, 256> keycode_table_arr = []() {
 	void();
 	return r;
 }();
-
-const keycode_table_ent* keycode_table = keycode_table_arr.data();
-extern const size_t keycode_table_size = keycode_table_arr.size();
 
 const char *modstring(uint8_t mods)
 {

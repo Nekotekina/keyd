@@ -9,8 +9,6 @@
 struct key_event output[MAX_EVENTS];
 size_t noutput = 0;
 
-extern const size_t keycode_table_size;
-
 static uint64_t get_time_ns()
 {
 	struct timespec ts;
@@ -32,7 +30,7 @@ static uint8_t lookup_code(const char *name)
 	if (!strcmp(name, "alt"))
 		return KEYD_LEFTALT;
 
-	for (i = 0; i < keycode_table_size; i++)
+	for (i = 0; i < 256; i++)
 		if (keycode_table[i].name && !strcmp(keycode_table[i].name, name))
 			return i;
 	return 0;

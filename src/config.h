@@ -65,8 +65,22 @@ union descriptor_arg {
 /* Describes the intended purpose of a key (corresponds to an 'action' in user parlance). */
 
 struct descriptor {
+	uint8_t id;
 	enum op op;
 	union descriptor_arg args[MAX_DESCRIPTOR_ARGS];
+};
+
+static_assert(sizeof(descriptor) == 8);
+
+// Experimental flat map with deferred sorting for layer keymap descriptors
+struct descriptor_map {
+	size_t size = 0;
+	std::array<descriptor, 3> maps{};
+	std::vector<descriptor> mapv; // Should be empty by default
+
+	void sort();
+	void set(uint8_t id, const descriptor& copy, uint8_t hint = 48);
+	const descriptor& operator[](uint8_t id) const;
 };
 
 struct chord {
@@ -97,7 +111,7 @@ struct layer {
 	bool modified = false; // Modified by kbd_eval
 	uint8_t mods;
 	std::vector<chord> chords;
-	std::array<descriptor, 256> keymap;
+	descriptor_map keymap;
 
 	/* Used for composite layers. */
 	size_t nr_constituents;
