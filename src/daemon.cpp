@@ -245,11 +245,7 @@ static struct config_ent *lookup_config_ent(const char *id, uint8_t flags)
 		ent = ent->next.get();
 	}
 
-	/* The wildcard should not match mice. */
-	if (rank == 1 && (flags == ID_MOUSE))
-		return NULL;
-	else
-		return match;
+	return match;
 }
 
 static void manage_device(struct device *dev)
@@ -264,6 +260,8 @@ static void manage_device(struct device *dev)
 		flags |= ID_KEYBOARD;
 	if (dev->capabilities & (CAP_MOUSE|CAP_MOUSE_ABS))
 		flags |= ID_MOUSE;
+	if (dev->capabilities & CAP_MOUSE_ABS)
+		flags |= ID_ABS_PTR;
 
 	if ((ent = lookup_config_ent(dev->id, flags))) {
 		if (device_grab(dev)) {

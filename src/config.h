@@ -20,6 +20,7 @@
 #define ID_EXCLUDED	1
 #define ID_MOUSE	2
 #define ID_KEYBOARD	4
+#define ID_ABS_PTR	8
 
 enum class op : signed char {
 	OP_NULL = 0,

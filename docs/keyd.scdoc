@@ -85,7 +85,8 @@ or
 ```
 	[ids]
 
-	*
+	k:*
+	m:*
 	-<id 1>
 	-<id 2>
 	...
@@ -98,7 +99,7 @@ For example:
 
 ```
 	[ids]
-	*
+	k:*
 	-0123:4567
 ```
 
@@ -129,11 +130,7 @@ Note: All keyboards defined within a given config file will share the
 same state. This is useful for linking separate input devices together
 (e.g foot pedals).
 
-Note 2: The wildcard will only match devices which keyd identifies as keyboards.
-keyd is also capable of *managing mice* (e.g to facilitate clearing
-of oneshot modifiers on click), but their ids must be explicitly listed.
-
-Note 3: *Mouse support is currently experimental*, and is mostly confined to
+Note 2: *Mouse support is currently experimental*, and is mostly confined to
 traditional mice (e.g touchpads). Adding some mice to
 your ids section may break your pointer. *It may also be necessary
 to explicitly blacklist mice which are misidentified as keyboards
@@ -241,7 +238,7 @@ Thus
 
 ```
 	[ids]
-	*
+	k:*
 
 	[control]
 	j = down
@@ -252,7 +249,7 @@ the full config actually looks something like this:
 
 ```
 	[ids]
-	*
+	k:*
 
 	[main]
 	leftcontrol = layer(control)
@@ -458,7 +455,7 @@ For example:
 
 /etc/keyd/default.conf:
 	[ids]
-	*
+	k:*
 
 	[main]
 	include common
@@ -501,7 +498,7 @@ E.g.
 ```
 /etc/keyd/default.conf:
 	[ids]
-	*
+	k:*
 
 	# Add our shared custom bindings.
 	include common
@@ -820,7 +817,7 @@ Make _esc+q_ toggle the dvorak letter layout.
 
 ```
 	[ids]
-	*
+	k:*
 
 	[main]
 	esc = layer(esc)
@@ -842,7 +839,7 @@ Invert the behaviour of the shift key without breaking modifier behaviour.
 
 ```
 	[ids]
-	*
+	k:*
 
 	[main]
 	1 = !

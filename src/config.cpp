@@ -787,30 +787,36 @@ static void parse_id_section(struct config *config, struct ini_section *section)
 		uint16_t product, vendor;
 
 		struct ini_entry *ent = &section->entries[i];
-		const char *s = ent->key;
+		std::string_view s = ent->key;
 
-		if (!strcmp(s, "*")) {
-			config->wildcard = 1;
-		} else if (strstr(s, "m:") == s) {
+		if (s.starts_with('*')) {
+			warn("Use k:* for capturing all keyboards");
+		} else if (s.starts_with("m:*")) {
+			config->wildcard |= CAP_MOUSE;
+		} else if (s.starts_with("k:*")) {
+			config->wildcard |= CAP_KEYBOARD;
+		} else if (s.starts_with("a:*")) {
+			config->wildcard |= CAP_MOUSE_ABS;
+		} else if (s.starts_with("m:") || s.starts_with("a:")) {
 			assert(config->nr_ids < ARRAY_SIZE(config->ids));
-			config->ids[config->nr_ids].flags = ID_MOUSE;
+			config->ids[config->nr_ids].flags = ID_MOUSE | (s[0] == 'a' ? ID_ABS_PTR : 0);
 
-			snprintf(config->ids[config->nr_ids++].id, sizeof(config->ids[0].id), "%s", s+2);
-		} else if (strstr(s, "k:") == s) {
+			snprintf(config->ids[config->nr_ids++].id, sizeof(config->ids[0].id), "%s", ent->key + 2);
+		} else if (s.starts_with("k:")) {
 			assert(config->nr_ids < ARRAY_SIZE(config->ids));
 			config->ids[config->nr_ids].flags = ID_KEYBOARD;
 
-			snprintf(config->ids[config->nr_ids++].id, sizeof(config->ids[0].id), "%s", s+2);
-		} else if (strstr(s, "-") == s) {
+			snprintf(config->ids[config->nr_ids++].id, sizeof(config->ids[0].id), "%s", ent->key + 2);
+		} else if (s.starts_with('-')) {
 			assert(config->nr_ids < ARRAY_SIZE(config->ids));
 			config->ids[config->nr_ids].flags = ID_EXCLUDED;
 
-			snprintf(config->ids[config->nr_ids++].id, sizeof(config->ids[0].id), "%s", s+1);
-		} else if (strlen(s) < sizeof(config->ids[config->nr_ids].id)-1) {
+			snprintf(config->ids[config->nr_ids++].id, sizeof(config->ids[0].id), "%s", ent->key + 1);
+		} else if (s.size() < sizeof(config->ids[config->nr_ids].id) - 1) {
 			assert(config->nr_ids < ARRAY_SIZE(config->ids));
 			config->ids[config->nr_ids].flags = ID_KEYBOARD | ID_MOUSE;
 
-			snprintf(config->ids[config->nr_ids++].id, sizeof(config->ids[0].id), "%s", s);
+			snprintf(config->ids[config->nr_ids++].id, sizeof(config->ids[0].id), "%s", ent->key);
 		} else {
 			warn("%s is not a valid device id", s);
 		}
@@ -974,12 +980,22 @@ int config_check_match(struct config *config, const char *id, uint8_t flags)
 			if (config->ids[i].flags & ID_EXCLUDED) {
 				return 0;
 			} else if (config->ids[i].flags & flags) {
+				if ((flags & ID_ABS_PTR) && (~config->ids[i].flags & ID_ABS_PTR))
+					continue;
 				return 2;
 			}
 		}
 	}
 
-	return config->wildcard ? 1 : 0;
+	// Wildcard match
+	if ((config->wildcard & CAP_KEYBOARD) && (flags & ID_KEYBOARD))
+		return 1;
+	if ((config->wildcard & CAP_MOUSE) && (flags & ID_MOUSE) && (~flags & ID_ABS_PTR))
+		return 1;
+	if ((config->wildcard & CAP_MOUSE_ABS) && (flags & ID_ABS_PTR))
+		return 1;
+
+	return 0;
 }
 
 int config_get_layer_index(const struct config *config, std::string_view name)

@@ -205,7 +205,7 @@ If you wish to help maintain this PPA, please contact
 
 	[ids]
 
-	*
+	k:*
 
 	[main]
 
@@ -226,7 +226,7 @@ following config:
 
 	[ids]
 
-	*
+	k:*
 
 	[main]
 
